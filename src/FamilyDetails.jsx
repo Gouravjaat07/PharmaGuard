@@ -339,13 +339,11 @@ function SharedNavbar({ currentPath, navigate, onOpenSidebar }) {
       padding: "0 24px", display: "flex", alignItems: "center",
       justifyContent: "space-between", height: 62,
     }}>
-      {/* Logo */}
       <div style={{ display:"flex", alignItems:"center", gap:12, cursor:"pointer" }} onClick={() => navigate("/analysis")}>
         <div style={{ width:34, height:34, borderRadius:8, background:"linear-gradient(135deg,#0B5ED7,#094bb3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, color:"#fff" }}>🧬</div>
         <span style={{ fontWeight:800, color:"#0B5ED7", fontFamily:"Syne,sans-serif" }}>PharmaGuard</span>
       </div>
 
-      {/* Desktop Nav */}
       <div className="hide-mobile" style={{ display:"flex", gap:4 }}>
         {NAV_ITEMS.map(item => (
           <button key={item.path}
@@ -356,9 +354,7 @@ function SharedNavbar({ currentPath, navigate, onOpenSidebar }) {
         ))}
       </div>
 
-      {/* Right side: profile avatar + mobile hamburger */}
       <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-        {/* Profile avatar button → opens sidebar */}
         <button
           onClick={onOpenSidebar}
           style={{
@@ -371,12 +367,9 @@ function SharedNavbar({ currentPath, navigate, onOpenSidebar }) {
           }}
           title="Open profile"
         >DR</button>
-
-        {/* Mobile hamburger */}
         <button className="pg-btn pg-btn-ghost hide-desktop" onClick={() => setMobileMenu(!mobileMenu)}>☰</button>
       </div>
 
-      {/* Mobile dropdown */}
       {mobileMenu && (
         <div style={{ position:"absolute", top:62, left:0, right:0, background:"#fff", padding:14, display:"flex", flexDirection:"column", gap:6, borderBottom:"1.5px solid rgba(11,94,215,0.1)", zIndex:50 }}>
           {NAV_ITEMS.map(item => (
@@ -397,10 +390,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen, navigate }) {
 
   return (
     <>
-      {/* Overlay */}
       <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
-
-      {/* Drawer */}
       <div style={{
         position:"fixed", top:0, right:0, height:"100vh", width:360,
         background:"#fff", borderLeft:"1.5px solid rgba(11,94,215,0.1)",
@@ -408,26 +398,16 @@ function Sidebar({ sidebarOpen, setSidebarOpen, navigate }) {
         boxShadow:"-8px 0 40px rgba(11,94,215,0.08)",
         animation:"slideInFromRight 0.32s cubic-bezier(0.4,0,0.2,1)",
       }}>
-        {/* Header */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:22 }}>
           <span className="syne" style={{ fontWeight:700, fontSize:15, color:"#212529" }}>User Profile</span>
           <button className="pg-btn pg-btn-ghost" onClick={() => setSidebarOpen(false)} style={{ padding:"5px 9px" }}>✕</button>
         </div>
-
-        {/* Avatar */}
         <div style={{ textAlign:"center", marginBottom:22 }}>
-          <div style={{
-            width:76, height:76, borderRadius:"50%",
-            background:"linear-gradient(135deg,#0B5ED7,#20C997)",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:28, fontWeight:800, color:"#fff", margin:"0 auto 10px",
-          }}>DR</div>
+          <div style={{ width:76, height:76, borderRadius:"50%", background:"linear-gradient(135deg,#0B5ED7,#20C997)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, fontWeight:800, color:"#fff", margin:"0 auto 10px" }}>DR</div>
           <div className="syne" style={{ fontSize:16, fontWeight:700, color:"#212529" }}>Dr. Emily Roberts</div>
           <div style={{ fontSize:12, color:"#8fa3b8" }}>Clinical Pharmacogenomics</div>
           <div className="pg-badge" style={{ background:"rgba(11,94,215,0.08)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.2)", marginTop:7 }}>🏥 Mount Sinai Hospital</div>
         </div>
-
-        {/* Stats */}
         <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
           {[
             { icon:"📊", l:"Analyses Completed", v:"247" },
@@ -441,28 +421,17 @@ function Sidebar({ sidebarOpen, setSidebarOpen, navigate }) {
             </div>
           ))}
         </div>
-
-        {/* Action buttons */}
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          <button
-            className="pg-btn pg-btn-family"
-            style={{ width:"100%", justifyContent:"center" }}
-            onClick={() => { setSidebarOpen(false); navigate("/family-section"); }}
-          >
+          <button className="pg-btn pg-btn-family" style={{ width:"100%", justifyContent:"center" }}
+            onClick={() => { setSidebarOpen(false); navigate("/family-section"); }}>
             👨‍👩‍👧‍👦 Go to Family Dashboard
           </button>
-          <button
-            className="pg-btn pg-btn-ghost"
-            style={{ width:"100%", justifyContent:"center" }}
-            onClick={() => { setSidebarOpen(false); navigate("/profile"); }}
-          >
+          <button className="pg-btn pg-btn-ghost" style={{ width:"100%", justifyContent:"center" }}
+            onClick={() => { setSidebarOpen(false); navigate("/profile"); }}>
             ⚙️ Settings
           </button>
-          <button
-            className="pg-btn pg-btn-ghost"
-            style={{ width:"100%", justifyContent:"center" }}
-            onClick={() => setSidebarOpen(false)}
-          >
+          <button className="pg-btn pg-btn-ghost" style={{ width:"100%", justifyContent:"center" }}
+            onClick={() => setSidebarOpen(false)}>
             🚪 Sign Out
           </button>
         </div>
@@ -1275,7 +1244,6 @@ function FamilyPage({ navigate }) {
       {drugPickerMember && <DrugPickerModal member={drugPickerMember} onClose={() => setDrugPickerMember(null)} onRunAnalysis={handleAnalyzeResults} />}
       {reportMember && <MemberReportModal member={reportMember} onClose={() => setReportMember(null)} />}
 
-      {/* Header */}
       <div className="pg-fadeUp" style={{ marginBottom:36 }}>
         <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", flexWrap:"wrap", gap:16, marginBottom:8 }}>
           <div>
@@ -1384,17 +1352,20 @@ function FamilyPage({ navigate }) {
   );
 }
 
-// ─── HISTORY PAGE ─────────────────────────────────────────────────────────────
+// ─── HISTORY PAGE (FULL — matches Analysis file) ──────────────────────────────
 function HistoryPage() {
   const HISTORY = [
-    { id:"H001", date:"2025-02-15", sampleId:"SAMPLE_AB12CD", drugs:["WARFARIN","CLOPIDOGREL"], highRiskCount:1 },
-    { id:"H002", date:"2025-02-10", sampleId:"SAMPLE_XY99ZW", drugs:["CODEINE","SIMVASTATIN","TRAMADOL"], highRiskCount:2 },
-    { id:"H003", date:"2025-01-28", sampleId:"SAMPLE_GH34MN", drugs:["AZATHIOPRINE","IRINOTECAN"], highRiskCount:2 },
+    { id:"H001", date:"2025-02-15", sampleId:"SAMPLE_AB12CD", drugs:["WARFARIN","CLOPIDOGREL"], highRiskCount:1, status:"Complete", sampleCount:834 },
+    { id:"H002", date:"2025-02-10", sampleId:"SAMPLE_XY99ZW", drugs:["CODEINE","SIMVASTATIN","TRAMADOL"], highRiskCount:2, status:"Complete", sampleCount:1247 },
+    { id:"H003", date:"2025-01-28", sampleId:"SAMPLE_GH34MN", drugs:["AZATHIOPRINE","IRINOTECAN"], highRiskCount:2, status:"Complete", sampleCount:962 },
+    { id:"H004", date:"2025-01-14", sampleId:"SAMPLE_KL77PQ", drugs:["TAMOXIFEN","VORICONAZOLE"], highRiskCount:1, status:"Complete", sampleCount:1108 },
   ];
   return (
     <div style={{ padding:"30px 22px", maxWidth:900, margin:"0 auto" }}>
-      <div className="syne" style={{ fontSize:30, fontWeight:800, marginBottom:6, color:"#212529" }}>Analysis History</div>
-      <div style={{ color:"#8fa3b8", fontSize:13, marginBottom:24 }}>Past pharmacogenomic analysis records</div>
+      <div style={{ marginBottom:28 }}>
+        <div className="syne" style={{ fontSize:30, fontWeight:800, marginBottom:6, color:"#212529" }}>Analysis History</div>
+        <div style={{ color:"#8fa3b8", fontSize:13 }}>Past pharmacogenomic analysis records for your practice</div>
+      </div>
       <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
         {HISTORY.map(h => (
           <div key={h.id} className="pg-card pg-fadeUp">
@@ -1402,14 +1373,17 @@ function HistoryPage() {
               <div>
                 <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:7 }}>
                   <span className="mono" style={{ color:"#0B5ED7", fontSize:13 }}>{h.sampleId}</span>
-                  <span className="pg-badge" style={{ background:"rgba(32,201,151,0.08)", color:"#20C997", border:"1px solid rgba(32,201,151,0.2)", fontSize:10 }}>Complete</span>
+                  <span className="pg-badge" style={{ background:"rgba(32,201,151,0.08)", color:"#20C997", border:"1px solid rgba(32,201,151,0.2)", fontSize:10 }}>{h.status}</span>
                 </div>
                 <div style={{ color:"#495057", fontSize:12 }}>Drugs: {h.drugs.join(" · ")}</div>
-                <div style={{ fontSize:11, color:"#8fa3b8", marginTop:4 }}>📅 {h.date}</div>
+                <div style={{ fontSize:11, color:"#8fa3b8", marginTop:4 }}>📅 {h.date} · {h.sampleCount.toLocaleString()} variants analyzed</div>
               </div>
-              <div style={{ display:"flex", gap:8 }}>
-                <span className="pg-badge" style={{ background:"rgba(235,52,52,0.08)", color:"#EB3434", border:"1px solid rgba(235,52,52,0.2)" }}>☠️ {h.highRiskCount} Toxic</span>
-                <button className="pg-btn pg-btn-primary" style={{ fontSize:12 }}>📊 View</button>
+              <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                <span className="pg-badge" style={{ background:"rgba(235,52,52,0.08)", color:"#EB3434", border:"1px solid rgba(235,52,52,0.2)", fontSize:11 }}>
+                  ☠️ {h.highRiskCount} Toxic Risk
+                </span>
+                <button className="pg-btn pg-btn-primary" style={{ fontSize:12 }}>📊 View Report</button>
+                <button className="pg-btn pg-btn-ghost" style={{ fontSize:12 }}>⬇ Download</button>
               </div>
             </div>
           </div>
@@ -1419,7 +1393,7 @@ function HistoryPage() {
   );
 }
 
-// ─── ABOUT PAGE ───────────────────────────────────────────────────────────────
+// ─── ABOUT PAGE (FULL — matches Analysis file) ────────────────────────────────
 function AboutPage() {
   return (
     <div style={{ padding:"30px 22px", maxWidth:820, margin:"0 auto" }}>
@@ -1427,17 +1401,17 @@ function AboutPage() {
         <div style={{ fontSize:56, marginBottom:14 }}>🧬</div>
         <div className="syne" style={{ fontSize:34, fontWeight:900, marginBottom:10, color:"#212529" }}>PharmaGuard</div>
         <div style={{ color:"#8fa3b8", fontSize:14, lineHeight:1.8, maxWidth:540, margin:"0 auto" }}>
-          Clinical-grade pharmacogenomic analysis platform with family tracking. Upload VCF files to predict drug response and optimize therapeutic decisions.
+          Clinical-grade pharmacogenomic analysis platform powered by CPIC guidelines. Upload patient VCF files to predict drug response, detect toxicity risks, and optimize therapeutic decisions with evidence-based precision.
         </div>
       </div>
       <div className="grid-3" style={{ marginBottom:22 }}>
         {[
-          {icon:"🧬",title:"PGx Analysis",desc:"CPIC Level A pharmacogenomic variant detection across 60+ drugs"},
-          {icon:"👨‍👩‍👧‍👦",title:"Family Tracking",desc:"Track genetic drug risks across all family members in one dashboard"},
-          {icon:"🛡️",title:"Risk Detection",desc:"Real-time toxicity and efficacy risk scoring with confidence intervals"},
-          {icon:"💊",title:"Drug Guidance",desc:"Evidence-based dosage & clinically validated alternatives"},
-          {icon:"📋",title:"Clinical Reports",desc:"Export-ready JSON, CSV, and printable PDF clinical summaries"},
-          {icon:"🔒",title:"HIPAA Ready",desc:"Local processing — your genomic data never leaves your browser"}
+          { icon:"🧬", title:"PGx Analysis", desc:"CPIC Level A pharmacogenomic variant detection across 50+ drugs" },
+          { icon:"🛡️", title:"Risk Detection", desc:"Real-time toxicity and efficacy risk scoring with confidence intervals" },
+          { icon:"💊", title:"Drug Guidance", desc:"Evidence-based dosage & clinically validated alternatives" },
+          { icon:"👨‍👩‍👧‍👦", title:"Family Tracking", desc:"Track genetic drug risks across all family members in one dashboard" },
+          { icon:"📋", title:"Clinical Reports", desc:"Export-ready JSON, CSV, and printable PDF clinical summaries" },
+          { icon:"🔒", title:"HIPAA Ready", desc:"Local processing — your genomic data never leaves your browser" },
         ].map(f => (
           <div key={f.title} className="pg-card">
             <div style={{ fontSize:26, marginBottom:8 }}>{f.icon}</div>
@@ -1445,6 +1419,23 @@ function AboutPage() {
             <div style={{ fontSize:12, color:"#8fa3b8", lineHeight:1.6 }}>{f.desc}</div>
           </div>
         ))}
+      </div>
+      <div className="pg-card" style={{ marginBottom:14 }}>
+        <div className="syne" style={{ fontWeight:700, marginBottom:10, fontSize:13, color:"#212529" }}>Supported Pharmacogenes</div>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
+          {["CYP2D6","CYP2C19","CYP2C9","VKORC1","TPMT","DPYD","SLCO1B1","ABCB1","UGT1A1","HLA-A","HLA-B","NUDT15","CYP3A5","CYP1A2","CYP2B6"].map(g => (
+            <span key={g} className="pg-badge mono" style={{ background:"rgba(11,94,215,0.08)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.18)", fontSize:11 }}>{g}</span>
+          ))}
+        </div>
+      </div>
+      <div className="pg-card">
+        <div className="syne" style={{ fontWeight:700, marginBottom:10, fontSize:13, color:"#212529" }}>Drug Coverage ({ALL_DRUGS.length}+ medications)</div>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+          {ALL_DRUGS.slice(0,20).map(d => (
+            <span key={d} className="pg-badge" style={{ background:"rgba(11,94,215,0.06)", color:"#495057", border:"1px solid rgba(11,94,215,0.12)", fontSize:10 }}>{d}</span>
+          ))}
+          <span className="pg-badge" style={{ background:"rgba(11,94,215,0.1)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.2)", fontSize:10 }}>+{ALL_DRUGS.length-20} more</span>
+        </div>
       </div>
     </div>
   );
@@ -1771,18 +1762,59 @@ export default function FamilySection() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Render the correct page based on route
-  const renderPage = () => {
-    switch (location.pathname) {
-      case "/analysis":       return <MainPage navigate={navigate} />;
-      case "/family-section": return <FamilyPage navigate={navigate} />;
-      case "/history":        return <HistoryPage />;
-      case "/about":          return <AboutPage />;
-      case "/profile":        return <ProfilePageStub />;
-      case "/technician":     return <TechnicianPageStub />;
-      default:                return <MainPage navigate={navigate} />;
+  // ── Internal page state so History/About work even when the router
+  //    only mounts this component on /family-section.
+  //    We seed it from location.pathname on first mount, then track
+  //    it locally so nav clicks always switch the view correctly.
+  const pathToPage = (p) => {
+    if (p === "/analysis")       return "analysis";
+    if (p === "/family-section") return "family";
+    if (p === "/history")        return "history";
+    if (p === "/about")          return "about";
+    if (p === "/profile")        return "profile";
+    if (p === "/technician")     return "technician";
+    return "family"; // default for this file
+  };
+
+  const [activePage, setActivePage] = useState(() => pathToPage(location.pathname));
+
+  // Handle navigation: ONLY switch internal state — never call navigate()
+  // for internal routes. Calling navigate() changes the URL which makes
+  // React Router unmount this component (if /history or /about aren't
+  // registered in the router), causing a blank page.
+  const handleNavigate = (path) => {
+    const internalRoutes = ["/analysis", "/family-section", "/history", "/about", "/profile", "/technician"];
+    if (internalRoutes.includes(path)) {
+      setActivePage(pathToPage(path));
+      // Update URL bar without triggering router re-mount
+      window.history.pushState(null, "", path);
+    } else {
+      navigate(path);
     }
   };
+
+  const renderPage = () => {
+    switch (activePage) {
+      case "analysis":    return <MainPage navigate={handleNavigate} />;
+      case "family":      return <FamilyPage navigate={handleNavigate} />;
+      case "history":     return <HistoryPage />;
+      case "about":       return <AboutPage />;
+      case "profile":     return <ProfilePageStub />;
+      case "technician":  return <TechnicianPageStub />;
+      default:            return <FamilyPage navigate={handleNavigate} />;
+    }
+  };
+
+  // Current "path" for the navbar active-tab highlight
+  const currentPath = (() => {
+    if (activePage === "analysis")   return "/analysis";
+    if (activePage === "family")     return "/family-section";
+    if (activePage === "history")    return "/history";
+    if (activePage === "about")      return "/about";
+    if (activePage === "profile")    return "/profile";
+    if (activePage === "technician") return "/technician";
+    return "/family-section";
+  })();
 
   return (
     <div style={{ minHeight:"100vh", background:"#F8F9FA", color:"#212529", fontFamily:"'Epilogue',sans-serif" }}>
@@ -1792,21 +1824,18 @@ export default function FamilySection() {
       <div style={{ position:"fixed", bottom:"-10%", right:"-5%", width:400, height:400, borderRadius:"50%", background:"radial-gradient(circle,rgba(32,201,151,0.06),transparent 68%)", zIndex:0, pointerEvents:"none" }} />
 
       <div style={{ position:"relative", zIndex:1 }}>
-        {/* Shared Navbar — pass sidebar opener */}
         <SharedNavbar
-          currentPath={location.pathname}
-          navigate={navigate}
+          currentPath={currentPath}
+          navigate={handleNavigate}
           onOpenSidebar={() => setSidebarOpen(true)}
         />
 
-        {/* Page Content */}
         {renderPage()}
 
-        {/* Sidebar — pass navigate so it can route */}
         <Sidebar
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
-          navigate={navigate}
+          navigate={handleNavigate}
         />
 
         {/* Footer */}

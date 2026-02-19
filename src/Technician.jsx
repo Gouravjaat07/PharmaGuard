@@ -192,6 +192,14 @@ const PAYMENT_METHODS = [
 
 const INDIAN_STATES = ["Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Delhi","Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"];
 
+// ─── HISTORY DATA ──────────────────────────────────────────────────────────────
+const BOOKING_HISTORY = [
+  { id:"PG-AB12CD", date:"2025-02-15", tests:["CBC","Urine Routine Analysis"], tech:"Dr. Riya Sharma", techAvatar:"👩‍⚕️", paid:448, status:"Completed", reportReady:true, address:"123 Main St, Delhi" },
+  { id:"PG-XY99ZW", date:"2025-02-10", tests:["Lipid Profile","HbA1c"], tech:"Rahul Mehta", techAvatar:"👨‍⚕️", paid:748, status:"Completed", reportReady:true, address:"45 Park Ave, Mumbai" },
+  { id:"PG-GH34MN", date:"2025-01-28", tests:["Thyroid Panel (T3/T4/TSH)"], tech:"Priya Nair", techAvatar:"👩‍🔬", paid:599, status:"Completed", reportReady:true, address:"78 Green Lane, Bangalore" },
+  { id:"PG-KL77PQ", date:"2025-01-14", tests:["PGx Pharmacogenomics Panel","LFT"], tech:"Dr. Riya Sharma", techAvatar:"👩‍⚕️", paid:3998, status:"Completed", reportReady:true, address:"12 Rose Garden, Hyderabad" },
+];
+
 // ─── MINI COMPONENTS ──────────────────────────────────────────────────────────
 
 function StarRating({ rating }) {
@@ -205,7 +213,6 @@ function StarRating({ rating }) {
   );
 }
 
-// Steps: 1=Schedule, 2=Details, 3=Review/Payment (test selection step removed)
 function ProgressSteps({ current }) {
   const steps = [
     { num:1, label:"Schedule" },
@@ -787,15 +794,163 @@ function UserDashboard({ booking }) {
   );
 }
 
+// ─── HISTORY PAGE ──────────────────────────────────────────────────────────────
+function HistoryPage() {
+  return (
+    <div style={{ padding:"30px 22px", maxWidth:900, margin:"0 auto" }}>
+      <div className="lab-fadeUp" style={{ marginBottom:28 }}>
+        <div className="fraunces" style={{ fontSize:30, fontWeight:800, marginBottom:6, color:"#212529" }}>Booking History</div>
+        <div style={{ color:"#6c757d", fontSize:13 }}>Your past lab visit records and test reports</div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))", gap:12, marginBottom:28 }}>
+        {[
+          { icon:"📋", l:"Total Bookings", v:BOOKING_HISTORY.length, col:"#0B5ED7" },
+          { icon:"✅", l:"Completed", v:BOOKING_HISTORY.filter(b=>b.status==="Completed").length, col:"#20C997" },
+          { icon:"📊", l:"Reports Ready", v:BOOKING_HISTORY.filter(b=>b.reportReady).length, col:"#6EA8FE" },
+          { icon:"💰", l:"Total Spent", v:`₹${BOOKING_HISTORY.reduce((acc,b)=>acc+b.paid,0).toLocaleString("en-IN")}`, col:"#f59e0b" },
+        ].map(s => (
+          <div key={s.l} style={{ padding:"14px", background:"rgba(11,94,215,0.02)", borderRadius:13, border:"1px solid rgba(11,94,215,0.06)", textAlign:"center" }}>
+            <div style={{ fontSize:20, marginBottom:4 }}>{s.icon}</div>
+            <div className="fraunces" style={{ fontSize:20, fontWeight:800, color:s.col }}>{s.v}</div>
+            <div style={{ fontSize:10, color:"#6c757d" }}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+        {BOOKING_HISTORY.map((h, i) => (
+          <div key={h.id} className="pg-card lab-fadeUp" style={{ animationDelay:`${i*0.08}s` }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:12 }}>
+              <div style={{ display:"flex", gap:14, alignItems:"flex-start", flex:1 }}>
+                <div style={{ width:52, height:52, borderRadius:12, background:"linear-gradient(135deg,rgba(11,94,215,0.12),rgba(110,168,254,0.15))", border:"1px solid rgba(11,94,215,0.2)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <div style={{ fontSize:16, fontWeight:900, color:"#0B5ED7" }}>{new Date(h.date).getDate()}</div>
+                  <div style={{ fontSize:8, color:"#0B5ED7", fontWeight:600 }}>{new Date(h.date).toLocaleDateString("en-IN",{month:"short"}).toUpperCase()}</div>
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5 }}>
+                    <span className="mono" style={{ color:"#0B5ED7", fontSize:12, fontWeight:700 }}>#{h.id}</span>
+                    <span className="pg-badge" style={{ background:"rgba(32,201,151,0.1)", color:"#20C997", border:"1px solid rgba(32,201,151,0.25)", fontSize:9 }}>✓ {h.status}</span>
+                  </div>
+                  <div style={{ fontSize:13, fontWeight:600, color:"#212529", marginBottom:4 }}>
+                    {h.tests.join(" · ")}
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                    <span style={{ fontSize:11, color:"#6c757d" }}>👤 {h.tech}</span>
+                    <span style={{ fontSize:11, color:"#6c757d" }}>📍 {h.address}</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
+                <div className="fraunces" style={{ fontSize:20, fontWeight:800, color:"#20C997" }}>₹{h.paid.toLocaleString("en-IN")}</div>
+                <div style={{ display:"flex", gap:7 }}>
+                  {h.reportReady && (
+                    <button className="pg-btn pg-btn-ghost" style={{ fontSize:11 }}>📊 View Report</button>
+                  )}
+                  <button className="pg-btn pg-btn-primary" style={{ fontSize:11 }}>⬇ Receipt</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── ABOUT PAGE ────────────────────────────────────────────────────────────────
+function AboutPage() {
+  return (
+    <div style={{ padding:"30px 22px", maxWidth:820, margin:"0 auto" }}>
+      <div className="pg-card lab-fadeUp" style={{ textAlign:"center", padding:44, marginBottom:22 }}>
+        <div style={{ fontSize:56, marginBottom:14 }}>🏠</div>
+        <div className="fraunces" style={{ fontSize:34, fontWeight:900, marginBottom:10, color:"#212529" }}>Lab at Your Doorstep</div>
+        <div style={{ color:"#6c757d", fontSize:14, lineHeight:1.8, maxWidth:540, margin:"0 auto" }}>
+          PharmaGuard's Home Lab service connects you with NABL-accredited lab technicians who visit your home for sample collection — delivering fast, accurate results with zero hassle.
+        </div>
+        <div style={{ display:"flex", justifyContent:"center", gap:10, marginTop:18, flexWrap:"wrap" }}>
+          {["NABL Accredited","HIPAA Compliant","24/7 Available","ISO 15189 Certified"].map(b => (
+            <span key={b} className="pg-badge" style={{ background:"rgba(11,94,215,0.08)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.2)", fontSize:11 }}>{b}</span>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:14, marginBottom:22 }}>
+        {[
+          { icon:"🔬", title:"NABL Certified Labs", desc:"All tests processed at ISO 15189 accredited facilities with stringent quality controls" },
+          { icon:"🛵", title:"Home Sample Collection", desc:"Trained phlebotomists arrive at your doorstep at your chosen time — no clinic visits needed" },
+          { icon:"⚡", title:"Fast Digital Reports", desc:"Test results delivered digitally in 2-48 hours depending on the test type" },
+          { icon:"🛡️", title:"HIPAA Compliant", desc:"Your health data is fully encrypted and protected under strict privacy standards" },
+          { icon:"♻️", title:"Free Reschedule", desc:"Flexible rescheduling up to 2 hours before your appointment at no extra charge" },
+          { icon:"🏅", title:"Verified Technicians", desc:"Every technician is background-verified, trained, and carries sterile sealed equipment" },
+        ].map(f => (
+          <div key={f.title} className="pg-card lab-fadeUp">
+            <div style={{ fontSize:26, marginBottom:8 }}>{f.icon}</div>
+            <div style={{ fontWeight:700, marginBottom:5, fontSize:13, color:"#212529" }}>{f.title}</div>
+            <div style={{ fontSize:12, color:"#6c757d", lineHeight:1.6 }}>{f.desc}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="pg-card lab-fadeUp" style={{ marginBottom:14 }}>
+        <div style={{ fontWeight:700, marginBottom:14, fontSize:14, color:"#212529" }}>🧪 Available Tests ({LAB_TESTS.length})</div>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+          {LAB_TESTS.map(t => (
+            <span key={t.id} className="pg-badge" style={{ background:"rgba(11,94,215,0.05)", color:"#495057", border:"1px solid rgba(11,94,215,0.1)", fontSize:11, padding:"5px 12px" }}>
+              {t.icon} {t.name}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="pg-card lab-fadeUp" style={{ marginBottom:14 }}>
+        <div style={{ fontWeight:700, marginBottom:14, fontSize:14, color:"#212529" }}>👨‍⚕️ Our Technician Team</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:12 }}>
+          {TECHNICIANS.map(tech => (
+            <div key={tech.id} style={{ padding:"14px", background:"rgba(11,94,215,0.03)", borderRadius:12, border:"1px solid rgba(11,94,215,0.08)", textAlign:"center" }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>{tech.avatar}</div>
+              <div style={{ fontSize:13, fontWeight:700, color:"#212529", marginBottom:3 }}>{tech.name}</div>
+              <div style={{ fontSize:11, color:"#6c757d", marginBottom:6 }}>{tech.spec} · {tech.exp}</div>
+              <StarRating rating={tech.rating} />
+              <div style={{ marginTop:6 }}>
+                <span className="pg-badge" style={{ background:"rgba(11,94,215,0.08)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.15)", fontSize:9 }}>🏅 {tech.badge}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="pg-card lab-fadeUp">
+        <div style={{ fontWeight:700, marginBottom:14, fontSize:14, color:"#212529" }}>❓ Frequently Asked Questions</div>
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {[
+            { q:"How early can I book a technician?", a:"You can book same-day appointments up to 2 hours in advance. For urgent bookings, a technician can arrive within 45 minutes (surcharge applies)." },
+            { q:"What equipment does the technician bring?", a:"All technicians carry sterile, sealed, single-use phlebotomy equipment including vacutainers, needles, swabs, and cold chain sample containers." },
+            { q:"How are my samples processed?", a:"Samples are transported in temperature-controlled containers directly to our partner NABL-accredited labs. Chain of custody is maintained throughout." },
+            { q:"When will I get my reports?", a:"Routine tests are available in 2-8 hours. Specialized tests like Thyroid or PGx panels may take 8-48 hours. All reports are delivered digitally." },
+            { q:"What is your cancellation policy?", a:"Cancel up to 2 hours before your appointment for a full refund. Cancellations within 2 hours may incur a convenience fee of ₹99." },
+          ].map((faq, i) => (
+            <div key={i} style={{ padding:"14px 16px", background:"rgba(11,94,215,0.02)", borderRadius:10, border:"1px solid rgba(11,94,215,0.07)" }}>
+              <div style={{ fontSize:13, fontWeight:600, color:"#212529", marginBottom:6 }}>❓ {faq.q}</div>
+              <div style={{ fontSize:12, color:"#6c757d", lineHeight:1.7 }}>{faq.a}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function LabTechnicianPage() {
   useEffect(() => { injectStyles(); }, []);
 
+  // page: "booking" | "history" | "about"
+  const [page, setPage] = useState("booking");
+
   // Steps: 0=landing, 1=schedule, 2=details, 3=review/payment, 4=confirmed, 5=dashboard
-  // Test selection step (previously step 1) is removed entirely.
-  // All tests are included by default when booking.
   const [step, setStep] = useState(0);
-  const [selectedTests] = useState(LAB_TESTS.map(t => t.id)); // all tests included
+  const [selectedTests] = useState(LAB_TESTS.map(t => t.id));
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
   const [selectedTech, setSelectedTech] = useState(null);
@@ -816,9 +971,9 @@ export default function LabTechnicianPage() {
 
   const scrollTop = () => { topRef.current?.scrollIntoView({ behavior:"smooth" }); };
 
-  // Both "Book Now" buttons go directly to the schedule step (step 1)
   const handleBookNow = () => {
     setUrgent(false);
+    setPage("booking");
     setStep(1);
     scrollTop();
   };
@@ -828,6 +983,7 @@ export default function LabTechnicianPage() {
     setSelectedDate(new Date().toISOString().split("T")[0]);
     setSelectedTime("08:00");
     showNotif("Urgent booking activated — surcharge of ₹199 applies", "warning");
+    setPage("booking");
     setStep(1);
     scrollTop();
   };
@@ -882,22 +1038,43 @@ export default function LabTechnicianPage() {
     scrollTop();
   };
 
-  // ─── SHARED NAVBAR — pixel-perfect match to Profile page ─────────────────────
+  // ─── NAVBAR ────────────────────────────────────────────────────────────────────
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenu, setMobileMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const NAV_ITEMS = [
-    { label: "Dashboard",        key: "main",       path: "/analysis",       dot: false },
-    { label: "👨‍👩‍👧‍👦 Family",    key: "family",     path: "/family-section", dot: true  },
-    { label: "Book Technician",  key: "technician", path: "/technician",     dot: false },
-    { label: "History",          key: "history",    path: "/history",        dot: false },
-    { label: "About",            key: "about",      path: "/about",          dot: false },
-    { label: "Profile",          key: "profile",    path: "/profile",        dot: false },
+    { label: "Dashboard",        key: "main",       path: "/analysis",       dot: false, internal: false },
+    { label: "👨‍👩‍👧‍👦 Family",    key: "family",     path: "/family-section", dot: true,  internal: false },
+    { label: "Book Technician",  key: "technician", path: "/technician",     dot: false, internal: false },
+    { label: "History",          key: "history",    path: "/history",        dot: false, internal: true  },
+    { label: "About",            key: "about",      path: "/about",          dot: false, internal: true  },
+    { label: "Profile",          key: "profile",    path: "/profile",        dot: false, internal: false },
   ];
 
-  const isActive = (item) => location.pathname === item.path || location.pathname === item.key;
+  const isActive = (item) => {
+    if (item.internal) {
+      if (item.key === "history") return page === "history";
+      if (item.key === "about") return page === "about";
+    }
+    if (item.key === "technician") return page === "booking";
+    return location.pathname === item.path;
+  };
+
+  const handleNavClick = (item) => {
+    setMobileMenu(false);
+    if (item.internal) {
+      if (item.key === "history") { setPage("history"); scrollTop(); }
+      if (item.key === "about") { setPage("about"); scrollTop(); }
+    } else if (item.key === "technician") {
+      setPage("booking");
+      setStep(0);
+      scrollTop();
+    } else {
+      navigate(item.path);
+    }
+  };
 
   const NavBar = () => (
     <nav style={{
@@ -908,7 +1085,6 @@ export default function LabTechnicianPage() {
       justifyContent:"space-between", height:62,
       boxShadow:"0 2px 12px rgba(11,94,215,0.06)"
     }}>
-      {/* Logo */}
       <div style={{ display:"flex", alignItems:"center", gap:14 }}>
         <div style={{ display:"flex", alignItems:"center", gap:9, cursor:"pointer" }} onClick={() => navigate("/analysis")}>
           <div style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,#0B5ED7,#094bb3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, boxShadow:"0 4px 12px rgba(11,94,215,0.25)" }}>🧬</div>
@@ -918,12 +1094,11 @@ export default function LabTechnicianPage() {
           </div>
         </div>
 
-        {/* Desktop nav links */}
         <div className="hide-mobile" style={{ display:"flex", gap:2, marginLeft:16 }}>
           {NAV_ITEMS.map(item => (
             <button key={item.key}
               className={`nav-link tab-btn ${isActive(item) ? "active" : ""}`}
-              onClick={() => { navigate(item.path); setMobileMenu(false); }}
+              onClick={() => handleNavClick(item)}
               style={{ position:"relative", color:isActive(item)?"#0B5ED7":"#495057" }}
             >
               {item.label}
@@ -933,9 +1108,8 @@ export default function LabTechnicianPage() {
         </div>
       </div>
 
-      {/* Right side */}
       <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-        {step >= 1 && step < 4 && totalPrice > 0 && (
+        {page === "booking" && step >= 1 && step < 4 && totalPrice > 0 && (
           <div className="hide-mobile" style={{ background:"rgba(11,94,215,0.07)", border:"1.5px solid rgba(11,94,215,0.15)", borderRadius:9, padding:"5px 12px", display:"flex", alignItems:"center", gap:6 }}>
             <span style={{ fontSize:11, color:"#6c757d" }}>Cart:</span>
             <span className="fraunces" style={{ fontSize:14, fontWeight:800, color:"#0B5ED7" }}>₹{totalPrice.toLocaleString("en-IN")}</span>
@@ -957,17 +1131,16 @@ export default function LabTechnicianPage() {
         </button>
       </div>
 
-      {/* Mobile dropdown */}
       {mobileMenu && (
         <div style={{ position:"absolute", top:62, left:0, right:0, background:"#fff", borderBottom:"1.5px solid rgba(11,94,215,0.1)", padding:14, display:"flex", flexDirection:"column", gap:6, boxShadow:"0 8px 20px rgba(11,94,215,0.08)", zIndex:200 }}>
           {NAV_ITEMS.map(item => (
             <button key={item.key} className={`tab-btn ${isActive(item)?"active":""}`}
-              onClick={() => { navigate(item.path); setMobileMenu(false); }}
+              onClick={() => handleNavClick(item)}
               style={{ textAlign:"left", padding:"9px 12px" }}>
               {item.label}
             </button>
           ))}
-          {step >= 1 && step < 4 && totalPrice > 0 && (
+          {page === "booking" && step >= 1 && step < 4 && totalPrice > 0 && (
             <div style={{ borderTop:"1px solid rgba(11,94,215,0.08)", paddingTop:10, marginTop:4, display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px 0" }}>
               <span style={{ fontSize:12, color:"#6c757d" }}>Cart Total:</span>
               <span className="fraunces" style={{ fontSize:16, fontWeight:800, color:"#0B5ED7" }}>₹{totalPrice.toLocaleString("en-IN")}</span>
@@ -978,7 +1151,7 @@ export default function LabTechnicianPage() {
     </nav>
   );
 
-  // ─── SIDEBAR — matches Profile sidebar exactly ────────────────────────────────
+  // ─── SIDEBAR ───────────────────────────────────────────────────────────────────
   const LabSidebar = () => {
     if (!sidebarOpen) return null;
     return (
@@ -1026,7 +1199,6 @@ export default function LabTechnicianPage() {
 
   return (
     <div style={{ minHeight:"100vh", background:"#F8F9FA", color:"#212529" }}>
-      {/* Background */}
       <div style={{ position:"fixed", inset:0, zIndex:0, pointerEvents:"none", backgroundImage:"radial-gradient(rgba(11,94,215,0.06) 1px,transparent 1px)", backgroundSize:"30px 30px" }} />
       <div style={{ position:"fixed", top:-300, right:-200, width:700, height:700, borderRadius:"50%", background:"radial-gradient(circle,rgba(11,94,215,0.05),transparent 70%)", zIndex:0, pointerEvents:"none" }} />
       <div style={{ position:"fixed", bottom:-200, left:-100, width:500, height:500, borderRadius:"50%", background:"radial-gradient(circle,rgba(32,201,151,0.04),transparent 70%)", zIndex:0, pointerEvents:"none" }} />
@@ -1045,337 +1217,348 @@ export default function LabTechnicianPage() {
 
         <div ref={topRef} style={{ maxWidth:1180, margin:"0 auto", padding:"30px 22px" }}>
 
-          {/* ── STEP 0: LANDING ── */}
-          {step === 0 && (
-            <div className="lab-fadeUp">
-              <div style={{ marginBottom:36 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
-                  <span className="pg-badge" style={{ background:"rgba(11,94,215,0.09)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.18)" }}>🏠 Lab at Home</span>
-                  <span className="pg-badge" style={{ background:"rgba(32,201,151,0.1)", color:"#20C997", border:"1px solid rgba(32,201,151,0.18)" }}>NABL Accredited</span>
-                  <span className="pg-badge" style={{ background:"rgba(11,94,215,0.08)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.15)" }}>24/7 Available</span>
-                </div>
-                <div className="fraunces" style={{ fontSize:"clamp(26px,4vw,42px)", fontWeight:900, lineHeight:1.1, marginBottom:10 }}>
-                  Book Lab Technician<br />
-                  <span style={{ background:"linear-gradient(135deg,#0B5ED7,#6EA8FE)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>At Your Doorstep</span>
-                </div>
-                <div style={{ color:"#6c757d", fontSize:13, lineHeight:1.7, maxWidth:540, marginBottom:24 }}>
-                  Professional lab technicians from NABL-accredited labs visit your home for sample collection. Fast reports, certified technicians, zero hassle.
-                </div>
-                <button className="pg-btn pg-btn-lab" style={{ fontSize:15, padding:"13px 32px", borderRadius:13 }} onClick={handleBookNow}>
-                  🏠 Book Now →
-                </button>
-              </div>
+          {/* ── HISTORY PAGE ── */}
+          {page === "history" && <HistoryPage />}
 
-              <UrgencyBanner onUrgent={handleUrgent} />
+          {/* ── ABOUT PAGE ── */}
+          {page === "about" && <AboutPage />}
 
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12, marginTop:28 }}>
-                {[
-                  { icon:"🔬", l:"NABL Accredited", d:"ISO 15189 certified labs" },
-                  { icon:"🛡️", l:"HIPAA Compliant", d:"Your data is always secure" },
-                  { icon:"⚡", l:"Fast Reports", d:"Digital reports in 2-48 hrs" },
-                  { icon:"♻️", l:"Free Reschedule", d:"Change up to 2 hrs before" },
-                  { icon:"💰", l:"Full Refund", d:"Cancel anytime policy" },
-                  { icon:"🏅", l:"Verified Techs", d:"Background & skill verified" },
-                ].map(f => (
-                  <div key={f.l} style={{ padding:"14px 12px", background:"rgba(11,94,215,0.02)", borderRadius:12, border:"1px solid rgba(11,94,215,0.05)", textAlign:"center" }}>
-                    <div style={{ fontSize:22, marginBottom:6 }}>{f.icon}</div>
-                    <div style={{ fontSize:11, fontWeight:700, color:"#212529", marginBottom:3 }}>{f.l}</div>
-                    <div style={{ fontSize:10, color:"#6c757d", lineHeight:1.4 }}>{f.d}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── STEP 4: CONFIRMED ── */}
-          {step === 4 && (
-            <div className="lab-fadeUp">
-              <BookingConfirmation booking={booking} onViewDashboard={() => { setStep(5); scrollTop(); }} />
-            </div>
-          )}
-
-          {/* ── STEP 5: DASHBOARD ── */}
-          {step === 5 && (
-            <div className="lab-fadeUp">
-              <UserDashboard booking={booking} />
-            </div>
-          )}
-
-          {/* ── BOOKING STEPS 1–3 ── */}
-          {step >= 1 && step <= 3 && (
+          {/* ── BOOKING PAGES ── */}
+          {page === "booking" && (
             <>
-              <div className="lab-fadeUp" style={{ marginBottom:28 }}>
-                {urgent && (
-                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
-                    <div className="urgency-ring" />
-                    <span style={{ fontSize:12, fontWeight:700, color:"#ef4444", letterSpacing:1 }}>URGENT BOOKING ACTIVE</span>
-                    <button onClick={() => setUrgent(false)} style={{ marginLeft:10, fontSize:10, background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.3)", borderRadius:5, padding:"2px 7px", color:"#ef4444", cursor:"pointer", fontFamily:"DM Sans" }}>✕ Cancel Urgent</button>
+              {/* STEP 0: LANDING */}
+              {step === 0 && (
+                <div className="lab-fadeUp">
+                  <div style={{ marginBottom:36 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+                      <span className="pg-badge" style={{ background:"rgba(11,94,215,0.09)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.18)" }}>🏠 Lab at Home</span>
+                      <span className="pg-badge" style={{ background:"rgba(32,201,151,0.1)", color:"#20C997", border:"1px solid rgba(32,201,151,0.18)" }}>NABL Accredited</span>
+                      <span className="pg-badge" style={{ background:"rgba(11,94,215,0.08)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.15)" }}>24/7 Available</span>
+                    </div>
+                    <div className="fraunces" style={{ fontSize:"clamp(26px,4vw,42px)", fontWeight:900, lineHeight:1.1, marginBottom:10 }}>
+                      Book Lab Technician<br />
+                      <span style={{ background:"linear-gradient(135deg,#0B5ED7,#6EA8FE)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>At Your Doorstep</span>
+                    </div>
+                    <div style={{ color:"#6c757d", fontSize:13, lineHeight:1.7, maxWidth:540, marginBottom:24 }}>
+                      Professional lab technicians from NABL-accredited labs visit your home for sample collection. Fast reports, certified technicians, zero hassle.
+                    </div>
+                    <button className="pg-btn pg-btn-lab" style={{ fontSize:15, padding:"13px 32px", borderRadius:13 }} onClick={handleBookNow}>
+                      🏠 Book Now →
+                    </button>
                   </div>
-                )}
-                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
-                  <span className="pg-badge" style={{ background:"rgba(11,94,215,0.09)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.18)" }}>🏠 Lab at Home</span>
-                  <span className="pg-badge" style={{ background:"rgba(32,201,151,0.1)", color:"#20C997", border:"1px solid rgba(32,201,151,0.18)" }}>NABL Accredited</span>
-                  <span className="pg-badge" style={{ background:"rgba(11,94,215,0.08)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.15)" }}>24/7 Available</span>
+
+                  <UrgencyBanner onUrgent={handleUrgent} />
+
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12, marginTop:28 }}>
+                    {[
+                      { icon:"🔬", l:"NABL Accredited", d:"ISO 15189 certified labs" },
+                      { icon:"🛡️", l:"HIPAA Compliant", d:"Your data is always secure" },
+                      { icon:"⚡", l:"Fast Reports", d:"Digital reports in 2-48 hrs" },
+                      { icon:"♻️", l:"Free Reschedule", d:"Change up to 2 hrs before" },
+                      { icon:"💰", l:"Full Refund", d:"Cancel anytime policy" },
+                      { icon:"🏅", l:"Verified Techs", d:"Background & skill verified" },
+                    ].map(f => (
+                      <div key={f.l} style={{ padding:"14px 12px", background:"rgba(11,94,215,0.02)", borderRadius:12, border:"1px solid rgba(11,94,215,0.05)", textAlign:"center" }}>
+                        <div style={{ fontSize:22, marginBottom:6 }}>{f.icon}</div>
+                        <div style={{ fontSize:11, fontWeight:700, color:"#212529", marginBottom:3 }}>{f.l}</div>
+                        <div style={{ fontSize:10, color:"#6c757d", lineHeight:1.4 }}>{f.d}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="fraunces" style={{ fontSize:"clamp(22px,3vw,34px)", fontWeight:900, lineHeight:1.1, marginBottom:6 }}>
-                  Book Lab Technician<br />
-                  <span style={{ background:"linear-gradient(135deg,#0B5ED7,#6EA8FE)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>At Your Doorstep</span>
+              )}
+
+              {/* STEP 4: CONFIRMED */}
+              {step === 4 && (
+                <div className="lab-fadeUp">
+                  <BookingConfirmation booking={booking} onViewDashboard={() => { setStep(5); scrollTop(); }} />
                 </div>
-              </div>
+              )}
 
-              <ProgressSteps current={step} />
+              {/* STEP 5: DASHBOARD */}
+              {step === 5 && (
+                <div className="lab-fadeUp">
+                  <UserDashboard booking={booking} />
+                </div>
+              )}
 
-              <div>
-                {/* STEP 1 — Schedule */}
-                {step === 1 && (
-                  <div className="lab-fadeUp" style={{ display:"flex", flexDirection:"column", gap:18 }}>
-                    <div className="pg-card">
-                      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-                        <div style={{ width:32, height:32, borderRadius:9, background:"linear-gradient(135deg,#0B5ED7,#0a4fc4)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#fff" }}>📅</div>
-                        <div>
-                          <div style={{ fontWeight:700, fontSize:15 }}>Pick a Date</div>
-                          <div style={{ fontSize:11, color:"#6c757d" }}>Available 7 days a week</div>
-                        </div>
-                        {selectedDate && <span className="pg-badge" style={{ marginLeft:"auto", background:"rgba(11,94,215,0.09)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.18)" }}>
-                          {new Date(selectedDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}
-                        </span>}
+              {/* BOOKING STEPS 1–3 */}
+              {step >= 1 && step <= 3 && (
+                <>
+                  <div className="lab-fadeUp" style={{ marginBottom:28 }}>
+                    {urgent && (
+                      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+                        <div className="urgency-ring" />
+                        <span style={{ fontSize:12, fontWeight:700, color:"#ef4444", letterSpacing:1 }}>URGENT BOOKING ACTIVE</span>
+                        <button onClick={() => setUrgent(false)} style={{ marginLeft:10, fontSize:10, background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.3)", borderRadius:5, padding:"2px 7px", color:"#ef4444", cursor:"pointer", fontFamily:"DM Sans" }}>✕ Cancel Urgent</button>
                       </div>
-                      <CalendarPicker selectedDate={selectedDate} onSelect={setSelectedDate} />
+                    )}
+                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+                      <span className="pg-badge" style={{ background:"rgba(11,94,215,0.09)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.18)" }}>🏠 Lab at Home</span>
+                      <span className="pg-badge" style={{ background:"rgba(32,201,151,0.1)", color:"#20C997", border:"1px solid rgba(32,201,151,0.18)" }}>NABL Accredited</span>
+                      <span className="pg-badge" style={{ background:"rgba(11,94,215,0.08)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.15)" }}>24/7 Available</span>
                     </div>
-
-                    <div className="pg-card">
-                      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-                        <div style={{ width:32, height:32, borderRadius:9, background:"linear-gradient(135deg,#0B5ED7,#6EA8FE)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#fff" }}>⏰</div>
-                        <div>
-                          <div style={{ fontWeight:700, fontSize:15 }}>Select Time Slot</div>
-                          <div style={{ fontSize:11, color:"#6c757d" }}>Slots available 7 AM – 7 PM</div>
-                        </div>
-                        {selectedTime && <span className="pg-badge" style={{ marginLeft:"auto", background:urgent?"rgba(239,68,68,0.12)":"rgba(32,201,151,0.1)", color:urgent?"#ef4444":"#20C997", border:`1px solid ${urgent?"rgba(239,68,68,0.3)":"rgba(32,201,151,0.2)"}` }}>{selectedTime}</span>}
-                      </div>
-                      <TimeSlotPicker selectedTime={selectedTime} onSelect={setSelectedTime} urgent={urgent} />
-                    </div>
-
-                    <div className="pg-card">
-                      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-                        <div style={{ width:32, height:32, borderRadius:9, background:"linear-gradient(135deg,#20C997,#17a880)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#fff" }}>👨‍⚕️</div>
-                        <div>
-                          <div style={{ fontWeight:700, fontSize:15 }}>Choose Technician</div>
-                          <div style={{ fontSize:11, color:"#6c757d" }}>All NABL-certified & background verified</div>
-                        </div>
-                      </div>
-                      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
-                        {TECHNICIANS.map(tech => (
-                          <TechnicianCard key={tech.id} tech={tech} selected={selectedTech===tech.id} onSelect={setSelectedTech} />
-                        ))}
-                      </div>
-                      <div style={{ marginTop:14, padding:"10px 14px", background:"rgba(11,94,215,0.02)", borderRadius:10, border:"1px solid rgba(11,94,215,0.05)", display:"flex", gap:8 }}>
-                        <span style={{ fontSize:14 }}>ℹ️</span>
-                        <span style={{ fontSize:11, color:"#6c757d", lineHeight:1.6 }}>All technicians are verified, trained in phlebotomy, and carry sterile sealed equipment. Technician details are shared 2 hours before appointment.</span>
-                      </div>
+                    <div className="fraunces" style={{ fontSize:"clamp(22px,3vw,34px)", fontWeight:900, lineHeight:1.1, marginBottom:6 }}>
+                      Book Lab Technician<br />
+                      <span style={{ background:"linear-gradient(135deg,#0B5ED7,#6EA8FE)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>At Your Doorstep</span>
                     </div>
                   </div>
-                )}
 
-                {/* STEP 2 — Personal Details */}
-                {step === 2 && (
-                  <div className="pg-card lab-fadeUp">
-                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:24 }}>
-                      <div style={{ width:32, height:32, borderRadius:9, background:"linear-gradient(135deg,#0B5ED7,#0a4fc4)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#fff" }}>2</div>
-                      <div>
-                        <div style={{ fontWeight:700, fontSize:15 }}>Your Details</div>
-                        <div style={{ fontSize:11, color:"#6c757d" }}>Required for home visit & report delivery</div>
-                      </div>
-                    </div>
+                  <ProgressSteps current={step} />
 
-                    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-                      <div>
-                        <div style={{ fontSize:11, color:"#0B5ED7", fontWeight:700, letterSpacing:1.2, marginBottom:12, display:"flex", alignItems:"center", gap:6 }}>
-                          <div style={{ height:1, flex:1, background:"rgba(11,94,215,0.15)" }} />
-                          👤 PERSONAL INFORMATION
-                          <div style={{ height:1, flex:1, background:"rgba(11,94,215,0.15)" }} />
-                        </div>
-                        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12 }}>
-                          {[
-                            { k:"name", label:"Full Name *", type:"text", placeholder:"As per government ID" },
-                            { k:"phone", label:"Mobile Number *", type:"tel", placeholder:"+91 XXXXX XXXXX" },
-                            { k:"email", label:"Email Address *", type:"email", placeholder:"For report delivery" },
-                            { k:"age", label:"Age *", type:"number", placeholder:"In years" },
-                          ].map(f => (
-                            <div key={f.k}>
-                              <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>{f.label.toUpperCase()}</label>
-                              <input className="pg-input" type={f.type} placeholder={f.placeholder} value={form[f.k]} onChange={e => setF(f.k, e.target.value)} />
+                  <div>
+                    {/* STEP 1 — Schedule */}
+                    {step === 1 && (
+                      <div className="lab-fadeUp" style={{ display:"flex", flexDirection:"column", gap:18 }}>
+                        <div className="pg-card">
+                          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+                            <div style={{ width:32, height:32, borderRadius:9, background:"linear-gradient(135deg,#0B5ED7,#0a4fc4)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#fff" }}>📅</div>
+                            <div>
+                              <div style={{ fontWeight:700, fontSize:15 }}>Pick a Date</div>
+                              <div style={{ fontSize:11, color:"#6c757d" }}>Available 7 days a week</div>
                             </div>
-                          ))}
+                            {selectedDate && <span className="pg-badge" style={{ marginLeft:"auto", background:"rgba(11,94,215,0.09)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.18)" }}>
+                              {new Date(selectedDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}
+                            </span>}
+                          </div>
+                          <CalendarPicker selectedDate={selectedDate} onSelect={setSelectedDate} />
+                        </div>
+
+                        <div className="pg-card">
+                          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+                            <div style={{ width:32, height:32, borderRadius:9, background:"linear-gradient(135deg,#0B5ED7,#6EA8FE)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#fff" }}>⏰</div>
+                            <div>
+                              <div style={{ fontWeight:700, fontSize:15 }}>Select Time Slot</div>
+                              <div style={{ fontSize:11, color:"#6c757d" }}>Slots available 7 AM – 7 PM</div>
+                            </div>
+                            {selectedTime && <span className="pg-badge" style={{ marginLeft:"auto", background:urgent?"rgba(239,68,68,0.12)":"rgba(32,201,151,0.1)", color:urgent?"#ef4444":"#20C997", border:`1px solid ${urgent?"rgba(239,68,68,0.3)":"rgba(32,201,151,0.2)"}` }}>{selectedTime}</span>}
+                          </div>
+                          <TimeSlotPicker selectedTime={selectedTime} onSelect={setSelectedTime} urgent={urgent} />
+                        </div>
+
+                        <div className="pg-card">
+                          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+                            <div style={{ width:32, height:32, borderRadius:9, background:"linear-gradient(135deg,#20C997,#17a880)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#fff" }}>👨‍⚕️</div>
+                            <div>
+                              <div style={{ fontWeight:700, fontSize:15 }}>Choose Technician</div>
+                              <div style={{ fontSize:11, color:"#6c757d" }}>All NABL-certified & background verified</div>
+                            </div>
+                          </div>
+                          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
+                            {TECHNICIANS.map(tech => (
+                              <TechnicianCard key={tech.id} tech={tech} selected={selectedTech===tech.id} onSelect={setSelectedTech} />
+                            ))}
+                          </div>
+                          <div style={{ marginTop:14, padding:"10px 14px", background:"rgba(11,94,215,0.02)", borderRadius:10, border:"1px solid rgba(11,94,215,0.05)", display:"flex", gap:8 }}>
+                            <span style={{ fontSize:14 }}>ℹ️</span>
+                            <span style={{ fontSize:11, color:"#6c757d", lineHeight:1.6 }}>All technicians are verified, trained in phlebotomy, and carry sterile sealed equipment. Technician details are shared 2 hours before appointment.</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* STEP 2 — Personal Details */}
+                    {step === 2 && (
+                      <div className="pg-card lab-fadeUp">
+                        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:24 }}>
+                          <div style={{ width:32, height:32, borderRadius:9, background:"linear-gradient(135deg,#0B5ED7,#0a4fc4)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#fff" }}>2</div>
                           <div>
-                            <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>GENDER</label>
-                            <select className="pg-select" value={form.gender} onChange={e => setF("gender", e.target.value)}>
-                              {["Male","Female","Non-binary","Prefer not to say"].map(g => <option key={g}>{g}</option>)}
-                            </select>
+                            <div style={{ fontWeight:700, fontSize:15 }}>Your Details</div>
+                            <div style={{ fontSize:11, color:"#6c757d" }}>Required for home visit & report delivery</div>
                           </div>
+                        </div>
+
+                        <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
                           <div>
-                            <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>BLOOD GROUP</label>
-                            <select className="pg-select" value={form.bloodGroup} onChange={e => setF("bloodGroup", e.target.value)}>
-                              {["A+","A-","B+","B-","AB+","AB-","O+","O-","Unknown"].map(b => <option key={b}>{b}</option>)}
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div style={{ fontSize:11, color:"#0B5ED7", fontWeight:700, letterSpacing:1.2, marginBottom:12, display:"flex", alignItems:"center", gap:6 }}>
-                          <div style={{ height:1, flex:1, background:"rgba(11,94,215,0.15)" }} />
-                          📍 HOME ADDRESS
-                          <div style={{ height:1, flex:1, background:"rgba(11,94,215,0.15)" }} />
-                        </div>
-                        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                          <div>
-                            <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>COMPLETE ADDRESS *</label>
-                            <textarea className="pg-textarea" placeholder="House/Flat no, Building name, Street name, Area/Locality..." value={form.address} onChange={e => setF("address", e.target.value)} style={{ minHeight:70 }} />
-                          </div>
-                          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:12 }}>
-                            <div>
-                              <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>LANDMARK</label>
-                              <input className="pg-input" placeholder="Near Metro/School..." value={form.landmark} onChange={e => setF("landmark", e.target.value)} />
+                            <div style={{ fontSize:11, color:"#0B5ED7", fontWeight:700, letterSpacing:1.2, marginBottom:12, display:"flex", alignItems:"center", gap:6 }}>
+                              <div style={{ height:1, flex:1, background:"rgba(11,94,215,0.15)" }} />
+                              👤 PERSONAL INFORMATION
+                              <div style={{ height:1, flex:1, background:"rgba(11,94,215,0.15)" }} />
                             </div>
-                            <div>
-                              <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>CITY *</label>
-                              <input className="pg-input" placeholder="City" value={form.city} onChange={e => setF("city", e.target.value)} />
-                            </div>
-                            <div>
-                              <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>STATE</label>
-                              <select className="pg-select" value={form.state} onChange={e => setF("state", e.target.value)}>
-                                {INDIAN_STATES.map(s => <option key={s}>{s}</option>)}
-                              </select>
-                            </div>
-                            <div>
-                              <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>PINCODE *</label>
-                              <input className="pg-input" placeholder="6-digit pincode" value={form.pincode} onChange={e => setF("pincode", e.target.value.replace(/\D/g,"").slice(0,6))} maxLength={6} />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div style={{ fontSize:11, color:"#20C997", fontWeight:700, letterSpacing:1.2, marginBottom:12, display:"flex", alignItems:"center", gap:6 }}>
-                          <div style={{ height:1, flex:1, background:"rgba(32,201,151,0.18)" }} />
-                          🏥 HEALTH INFORMATION (OPTIONAL)
-                          <div style={{ height:1, flex:1, background:"rgba(32,201,151,0.18)" }} />
-                        </div>
-                        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12 }}>
-                          {[
-                            { k:"height", label:"Height", placeholder:"e.g. 5'8\" or 172 cm" },
-                            { k:"weight", label:"Weight", placeholder:"e.g. 70 kg" },
-                            { k:"allergies", label:"Known Allergies", placeholder:"e.g. Penicillin, Latex..." },
-                            { k:"conditions", label:"Medical Conditions", placeholder:"e.g. Diabetes, BP..." },
-                          ].map(f => (
-                            <div key={f.k}>
-                              <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>{f.label.toUpperCase()}</label>
-                              <input className="pg-input" placeholder={f.placeholder} value={form[f.k]} onChange={e => setF(f.k, e.target.value)} />
-                            </div>
-                          ))}
-                        </div>
-                        <div style={{ marginTop:12 }}>
-                          <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>SPECIAL INSTRUCTIONS FOR TECHNICIAN</label>
-                          <textarea className="pg-textarea" placeholder="e.g. Ring doorbell twice, 3rd floor, lift available... any special requirements" value={form.instructions} onChange={e => setF("instructions", e.target.value)} />
-                        </div>
-                      </div>
-
-                      <div style={{ padding:"12px 14px", background:"rgba(32,201,151,0.05)", border:"1px solid rgba(32,201,151,0.15)", borderRadius:10 }}>
-                        <div style={{ fontSize:11, color:"#20C997", fontWeight:600, marginBottom:6 }}>✅ CONSENT & PRIVACY</div>
-                        <div style={{ fontSize:11, color:"#6c757d", lineHeight:1.7 }}>
-                          By proceeding, you consent to sample collection at the provided address and agree to PharmaGuard's
-                          <span style={{ color:"#0B5ED7", cursor:"pointer" }}> Privacy Policy</span> and
-                          <span style={{ color:"#0B5ED7", cursor:"pointer" }}> Terms of Service</span>.
-                          Your health data is encrypted and HIPAA-compliant.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* STEP 3 — Review & Pay */}
-                {step === 3 && (
-                  <div className="lab-fadeUp" style={{ display:"flex", flexDirection:"column", gap:16 }}>
-                    <div className="pg-card" style={{ border:"1px solid rgba(11,94,215,0.15)" }}>
-                      <div style={{ fontWeight:700, fontSize:15, marginBottom:18 }}>📋 Review Your Booking</div>
-
-                      <div style={{ marginBottom:18 }}>
-                        <div style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, marginBottom:10 }}>SELECTED TESTS</div>
-                        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                          {selectedTests.map(id => {
-                            const t = LAB_TESTS.find(x => x.id === id);
-                            return t ? (
-                              <div key={id} style={{ display:"flex", justifyContent:"space-between", padding:"10px 12px", background:"rgba(11,94,215,0.02)", borderRadius:9, border:"1px solid rgba(11,94,215,0.05)" }}>
-                                <div style={{ display:"flex", gap:8 }}>
-                                  <span style={{ fontSize:16 }}>{t.icon}</span>
-                                  <div>
-                                    <div style={{ fontSize:12, fontWeight:600, color:"#212529" }}>{t.name}</div>
-                                    <div style={{ fontSize:10, color:"#6c757d" }}>Report in {t.report} · {t.duration}</div>
-                                  </div>
+                            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12 }}>
+                              {[
+                                { k:"name", label:"Full Name *", type:"text", placeholder:"As per government ID" },
+                                { k:"phone", label:"Mobile Number *", type:"tel", placeholder:"+91 XXXXX XXXXX" },
+                                { k:"email", label:"Email Address *", type:"email", placeholder:"For report delivery" },
+                                { k:"age", label:"Age *", type:"number", placeholder:"In years" },
+                              ].map(f => (
+                                <div key={f.k}>
+                                  <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>{f.label.toUpperCase()}</label>
+                                  <input className="pg-input" type={f.type} placeholder={f.placeholder} value={form[f.k]} onChange={e => setF(f.k, e.target.value)} />
                                 </div>
-                                <span style={{ fontSize:13, fontWeight:700, color:"#20C997", alignSelf:"center" }}>₹{t.price}</span>
+                              ))}
+                              <div>
+                                <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>GENDER</label>
+                                <select className="pg-select" value={form.gender} onChange={e => setF("gender", e.target.value)}>
+                                  {["Male","Female","Non-binary","Prefer not to say"].map(g => <option key={g}>{g}</option>)}
+                                </select>
                               </div>
-                            ) : null;
-                          })}
-                          {urgent && (
-                            <div style={{ display:"flex", justifyContent:"space-between", padding:"10px 12px", background:"rgba(239,68,68,0.06)", borderRadius:9, border:"1px solid rgba(239,68,68,0.2)" }}>
-                              <div style={{ fontSize:12, fontWeight:600, color:"#ef4444" }}>🚨 Urgent Booking Surcharge</div>
-                              <span style={{ fontSize:13, fontWeight:700, color:"#ef4444" }}>₹199</span>
+                              <div>
+                                <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>BLOOD GROUP</label>
+                                <select className="pg-select" value={form.bloodGroup} onChange={e => setF("bloodGroup", e.target.value)}>
+                                  {["A+","A-","B+","B-","AB+","AB-","O+","O-","Unknown"].map(b => <option key={b}>{b}</option>)}
+                                </select>
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:18 }}>
-                        {[
-                          { l:"📍 Address", v:`${form.address}, ${form.city}` },
-                          { l:"📅 Date & Time", v:`${selectedDate ? new Date(selectedDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"}) : "—"} at ${selectedTime || "—"}` },
-                          { l:"👨‍⚕️ Technician", v:TECHNICIANS.find(t=>t.id===selectedTech)?.name || "—" },
-                          { l:"📞 Contact", v:form.phone },
-                        ].map(f => (
-                          <div key={f.l} style={{ padding:"10px 12px", background:"rgba(11,94,215,0.04)", borderRadius:9, border:"1px solid rgba(11,94,215,0.04)" }}>
-                            <div style={{ fontSize:10, color:"#6c757d", marginBottom:3 }}>{f.l}</div>
-                            <div style={{ fontSize:12, color:"#212529", fontWeight:600, lineHeight:1.4 }}>{f.v}</div>
                           </div>
-                        ))}
-                      </div>
 
-                      <div style={{ display:"flex", justifyContent:"space-between", padding:"14px 16px", background:"rgba(11,94,215,0.07)", borderRadius:11, border:"1px solid rgba(11,94,215,0.15)" }}>
-                        <div>
-                          <div style={{ fontSize:12, color:"#6c757d", marginBottom:3 }}>{selectedTests.length} test{selectedTests.length!==1?"s":""} · {urgent?"Urgent booking":"Standard booking"}</div>
-                          <div style={{ fontSize:11, color:"#6c757d" }}>Inclusive of all charges · NABL certified lab</div>
+                          <div>
+                            <div style={{ fontSize:11, color:"#0B5ED7", fontWeight:700, letterSpacing:1.2, marginBottom:12, display:"flex", alignItems:"center", gap:6 }}>
+                              <div style={{ height:1, flex:1, background:"rgba(11,94,215,0.15)" }} />
+                              📍 HOME ADDRESS
+                              <div style={{ height:1, flex:1, background:"rgba(11,94,215,0.15)" }} />
+                            </div>
+                            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                              <div>
+                                <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>COMPLETE ADDRESS *</label>
+                                <textarea className="pg-textarea" placeholder="House/Flat no, Building name, Street name, Area/Locality..." value={form.address} onChange={e => setF("address", e.target.value)} style={{ minHeight:70 }} />
+                              </div>
+                              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:12 }}>
+                                <div>
+                                  <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>LANDMARK</label>
+                                  <input className="pg-input" placeholder="Near Metro/School..." value={form.landmark} onChange={e => setF("landmark", e.target.value)} />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>CITY *</label>
+                                  <input className="pg-input" placeholder="City" value={form.city} onChange={e => setF("city", e.target.value)} />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>STATE</label>
+                                  <select className="pg-select" value={form.state} onChange={e => setF("state", e.target.value)}>
+                                    {INDIAN_STATES.map(s => <option key={s}>{s}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>PINCODE *</label>
+                                  <input className="pg-input" placeholder="6-digit pincode" value={form.pincode} onChange={e => setF("pincode", e.target.value.replace(/\D/g,"").slice(0,6))} maxLength={6} />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ fontSize:11, color:"#20C997", fontWeight:700, letterSpacing:1.2, marginBottom:12, display:"flex", alignItems:"center", gap:6 }}>
+                              <div style={{ height:1, flex:1, background:"rgba(32,201,151,0.18)" }} />
+                              🏥 HEALTH INFORMATION (OPTIONAL)
+                              <div style={{ height:1, flex:1, background:"rgba(32,201,151,0.18)" }} />
+                            </div>
+                            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12 }}>
+                              {[
+                                { k:"height", label:"Height", placeholder:"e.g. 5'8\" or 172 cm" },
+                                { k:"weight", label:"Weight", placeholder:"e.g. 70 kg" },
+                                { k:"allergies", label:"Known Allergies", placeholder:"e.g. Penicillin, Latex..." },
+                                { k:"conditions", label:"Medical Conditions", placeholder:"e.g. Diabetes, BP..." },
+                              ].map(f => (
+                                <div key={f.k}>
+                                  <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>{f.label.toUpperCase()}</label>
+                                  <input className="pg-input" placeholder={f.placeholder} value={form[f.k]} onChange={e => setF(f.k, e.target.value)} />
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ marginTop:12 }}>
+                              <label style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, display:"block", marginBottom:6 }}>SPECIAL INSTRUCTIONS FOR TECHNICIAN</label>
+                              <textarea className="pg-textarea" placeholder="e.g. Ring doorbell twice, 3rd floor, lift available... any special requirements" value={form.instructions} onChange={e => setF("instructions", e.target.value)} />
+                            </div>
+                          </div>
+
+                          <div style={{ padding:"12px 14px", background:"rgba(32,201,151,0.05)", border:"1px solid rgba(32,201,151,0.15)", borderRadius:10 }}>
+                            <div style={{ fontSize:11, color:"#20C997", fontWeight:600, marginBottom:6 }}>✅ CONSENT & PRIVACY</div>
+                            <div style={{ fontSize:11, color:"#6c757d", lineHeight:1.7 }}>
+                              By proceeding, you consent to sample collection at the provided address and agree to PharmaGuard's
+                              <span style={{ color:"#0B5ED7", cursor:"pointer" }}> Privacy Policy</span> and
+                              <span style={{ color:"#0B5ED7", cursor:"pointer" }}> Terms of Service</span>.
+                              Your health data is encrypted and HIPAA-compliant.
+                            </div>
+                          </div>
                         </div>
-                        <div style={{ textAlign:"right" }}>
-                          <div style={{ fontSize:11, color:"#6c757d", marginBottom:3 }}>TOTAL DUE</div>
-                          <div className="fraunces" style={{ fontSize:28, fontWeight:900, color:"#0B5ED7" }}>₹{(totalPrice + (urgent?199:0)).toLocaleString("en-IN")}</div>
+                      </div>
+                    )}
+
+                    {/* STEP 3 — Review & Pay */}
+                    {step === 3 && (
+                      <div className="lab-fadeUp" style={{ display:"flex", flexDirection:"column", gap:16 }}>
+                        <div className="pg-card" style={{ border:"1px solid rgba(11,94,215,0.15)" }}>
+                          <div style={{ fontWeight:700, fontSize:15, marginBottom:18 }}>📋 Review Your Booking</div>
+
+                          <div style={{ marginBottom:18 }}>
+                            <div style={{ fontSize:11, color:"#6c757d", fontWeight:600, letterSpacing:1, marginBottom:10 }}>SELECTED TESTS</div>
+                            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                              {selectedTests.map(id => {
+                                const t = LAB_TESTS.find(x => x.id === id);
+                                return t ? (
+                                  <div key={id} style={{ display:"flex", justifyContent:"space-between", padding:"10px 12px", background:"rgba(11,94,215,0.02)", borderRadius:9, border:"1px solid rgba(11,94,215,0.05)" }}>
+                                    <div style={{ display:"flex", gap:8 }}>
+                                      <span style={{ fontSize:16 }}>{t.icon}</span>
+                                      <div>
+                                        <div style={{ fontSize:12, fontWeight:600, color:"#212529" }}>{t.name}</div>
+                                        <div style={{ fontSize:10, color:"#6c757d" }}>Report in {t.report} · {t.duration}</div>
+                                      </div>
+                                    </div>
+                                    <span style={{ fontSize:13, fontWeight:700, color:"#20C997", alignSelf:"center" }}>₹{t.price}</span>
+                                  </div>
+                                ) : null;
+                              })}
+                              {urgent && (
+                                <div style={{ display:"flex", justifyContent:"space-between", padding:"10px 12px", background:"rgba(239,68,68,0.06)", borderRadius:9, border:"1px solid rgba(239,68,68,0.2)" }}>
+                                  <div style={{ fontSize:12, fontWeight:600, color:"#ef4444" }}>🚨 Urgent Booking Surcharge</div>
+                                  <span style={{ fontSize:13, fontWeight:700, color:"#ef4444" }}>₹199</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:18 }}>
+                            {[
+                              { l:"📍 Address", v:`${form.address}, ${form.city}` },
+                              { l:"📅 Date & Time", v:`${selectedDate ? new Date(selectedDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"}) : "—"} at ${selectedTime || "—"}` },
+                              { l:"👨‍⚕️ Technician", v:TECHNICIANS.find(t=>t.id===selectedTech)?.name || "—" },
+                              { l:"📞 Contact", v:form.phone },
+                            ].map(f => (
+                              <div key={f.l} style={{ padding:"10px 12px", background:"rgba(11,94,215,0.04)", borderRadius:9, border:"1px solid rgba(11,94,215,0.04)" }}>
+                                <div style={{ fontSize:10, color:"#6c757d", marginBottom:3 }}>{f.l}</div>
+                                <div style={{ fontSize:12, color:"#212529", fontWeight:600, lineHeight:1.4 }}>{f.v}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div style={{ display:"flex", justifyContent:"space-between", padding:"14px 16px", background:"rgba(11,94,215,0.07)", borderRadius:11, border:"1px solid rgba(11,94,215,0.15)" }}>
+                            <div>
+                              <div style={{ fontSize:12, color:"#6c757d", marginBottom:3 }}>{selectedTests.length} test{selectedTests.length!==1?"s":""} · {urgent?"Urgent booking":"Standard booking"}</div>
+                              <div style={{ fontSize:11, color:"#6c757d" }}>Inclusive of all charges · NABL certified lab</div>
+                            </div>
+                            <div style={{ textAlign:"right" }}>
+                              <div style={{ fontSize:11, color:"#6c757d", marginBottom:3 }}>TOTAL DUE</div>
+                              <div className="fraunces" style={{ fontSize:28, fontWeight:900, color:"#0B5ED7" }}>₹{(totalPrice + (urgent?199:0)).toLocaleString("en-IN")}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button className="pg-btn pg-btn-lab" style={{ width:"100%", justifyContent:"center", fontSize:15, padding:"14px", borderRadius:13 }} onClick={() => setShowPayment(true)}>
+                          🔒 Proceed to Secure Payment →
+                        </button>
+
+                        <div style={{ textAlign:"center" }}>
+                          <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:10, flexWrap:"wrap" }}>
+                            {["🔒 256-bit SSL","✅ NABL Certified","🔁 Free Reschedule","💰 Full Refund Policy"].map(t => (
+                              <span key={t} style={{ fontSize:10, color:"#6c757d" }}>{t}</span>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
 
-                    <button className="pg-btn pg-btn-lab" style={{ width:"100%", justifyContent:"center", fontSize:15, padding:"14px", borderRadius:13 }} onClick={() => setShowPayment(true)}>
-                      🔒 Proceed to Secure Payment →
-                    </button>
-
-                    <div style={{ textAlign:"center" }}>
-                      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:10, flexWrap:"wrap" }}>
-                        {["🔒 256-bit SSL","✅ NABL Certified","🔁 Free Reschedule","💰 Full Refund Policy"].map(t => (
-                          <span key={t} style={{ fontSize:10, color:"#6c757d" }}>{t}</span>
-                        ))}
-                      </div>
+                    {/* Navigation */}
+                    <div style={{ display:"flex", justifyContent:"space-between", marginTop:24 }}>
+                      <button className="pg-btn pg-btn-ghost" onClick={handleBack}>← Back</button>
+                      {step < 3 && (
+                        <button className="pg-btn pg-btn-lab" onClick={handleNext} style={{ fontSize:14, padding:"11px 28px" }}>
+                          {step === 2 ? "Review Booking →" : "Continue →"}
+                        </button>
+                      )}
                     </div>
                   </div>
-                )}
-
-                {/* Navigation */}
-                <div style={{ display:"flex", justifyContent:"space-between", marginTop:24 }}>
-                  <button className="pg-btn pg-btn-ghost" onClick={handleBack}>← Back</button>
-                  {step < 3 && (
-                    <button className="pg-btn pg-btn-lab" onClick={handleNext} style={{ fontSize:14, padding:"11px 28px" }}>
-                      {step === 2 ? "Review Booking →" : "Continue →"}
-                    </button>
-                  )}
-                </div>
-              </div>
+                </>
+              )}
             </>
           )}
         </div>
