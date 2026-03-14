@@ -27,7 +27,6 @@ const injectStyles = () => {
     @keyframes countUp { from{opacity:0;transform:scale(0.7);} to{opacity:1;transform:scale(1);} }
     @keyframes lineGrow { from{width:0;} to{width:100%;} }
     @keyframes borderPulse { 0%,100%{border-color:rgba(11,94,215,0.2);} 50%{border-color:rgba(11,94,215,0.5);} }
-    @keyframes glitch1 { 0%,100%{clip-path:inset(0 0 100% 0);} 10%{clip-path:inset(10% 0 60% 0);transform:translateX(-2px);} 20%{clip-path:inset(40% 0 30% 0);transform:translateX(2px);} 30%{clip-path:inset(70% 0 10% 0);transform:translateX(-1px);} 40%{clip-path:inset(0 0 90% 0);} 100%{clip-path:inset(0 0 100% 0);} }
     @keyframes slideInLeft { from{opacity:0;transform:translateX(-40px);} to{opacity:1;transform:translateX(0);} }
     @keyframes slideInRight { from{opacity:0;transform:translateX(40px);} to{opacity:1;transform:translateX(0);} }
     @keyframes shimmer { 0%{background-position:-200% 0;} 100%{background-position:200% 0;} }
@@ -238,13 +237,78 @@ const injectStyles = () => {
       background-size: 40px 40px;
     }
 
-    @media (max-width: 768px) {
-      .hide-mobile { display: none !important; }
-      .mobile-stack { flex-direction: column !important; }
-      .mobile-full { width: 100% !important; }
+    /* ── MOBILE MENU DRAWER ── */
+    .mobile-menu {
+      position: absolute;
+      top: 64px;
+      left: 0;
+      right: 0;
+      background: rgba(248,249,250,0.98);
+      border-bottom: 1px solid rgba(11,94,215,0.12);
+      padding: 20px 24px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 8px 32px rgba(11,94,215,0.08);
     }
-    @media (min-width: 769px) {
-      .hide-desktop { display: none !important; }
+    .mobile-menu-link {
+      font-size: 15px;
+      font-weight: 600;
+      color: #495057;
+      cursor: pointer;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(11,94,215,0.06);
+      transition: color 0.2s;
+      text-decoration: none;
+    }
+    .mobile-menu-link:hover { color: #0B5ED7; }
+    .mobile-menu-link:last-of-type { border-bottom: none; }
+
+    .mobile-auth-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(11,94,215,0.1);
+    }
+    .mobile-auth-buttons .btn-ghost,
+    .mobile-auth-buttons .btn-primary {
+      flex: 1;
+      justify-content: center;
+      font-size: 13px;
+      padding: 11px 16px;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1024px) {
+      .nav-desktop-links { display: none !important; }
+      .nav-desktop-auth { display: none !important; }
+      .nav-hamburger { display: flex !important; }
+    }
+    @media (min-width: 1025px) {
+      .nav-desktop-links { display: flex !important; }
+      .nav-desktop-auth { display: flex !important; }
+      .nav-hamburger { display: none !important; }
+    }
+
+    @media (max-width: 768px) {
+      .hero-stats { gap: 20px !important; }
+      .hero-stats > div { min-width: 80px; }
+      .how-it-works-grid > div { border-right: none !important; border-bottom: 1px solid rgba(11,94,215,0.08); }
+      .how-it-works-grid > div:last-child { border-bottom: none; }
+      .section-padding { padding: 60px 20px !important; }
+      .cta-section { padding: 40px 24px !important; }
+      .footer-cols { flex-direction: column !important; gap: 32px !important; }
+      table { font-size: 11px !important; }
+      table td, table th { padding: 10px 10px !important; }
+    }
+
+    @media (max-width: 480px) {
+      .hero-buttons { flex-direction: column !important; }
+      .hero-buttons button { width: 100%; justify-content: center; }
+      .cta-buttons { flex-direction: column !important; }
+      .cta-buttons button { width: 100% !important; justify-content: center; }
     }
   `;
   document.head.appendChild(s);
@@ -350,7 +414,7 @@ function SectionLabel({ children }) {
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function Home() {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState("home");
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -360,6 +424,13 @@ export default function Home() {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Close menu on resize to desktop
+  useEffect(() => {
+    const handleResize = () => { if (window.innerWidth >= 1025) setMenuOpen(false); };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const scrollTo = (id) => {
@@ -550,8 +621,10 @@ export default function Home() {
       </div>
 
       {/* ─── NAVBAR ──────────────────────────────────────────────────────────── */}
-      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, padding: "0 32px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", background: scrolled ? "rgba(248,249,250,0.96)" : "transparent", borderBottom: scrolled ? "1px solid rgba(11,94,215,0.1)" : "1px solid transparent", backdropFilter: scrolled ? "blur(20px)" : "none", transition: "all 0.3s" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, padding: "0 24px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", background: scrolled ? "rgba(248,249,250,0.96)" : "transparent", borderBottom: scrolled ? "1px solid rgba(11,94,215,0.1)" : "1px solid transparent", backdropFilter: scrolled ? "blur(20px)" : "none", transition: "all 0.3s" }}>
+
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg,#0B5ED7,#094bb3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, boxShadow: "0 0 20px rgba(11,94,215,0.25)" }}>🧬</div>
           <div>
             <div className="lora" style={{ fontSize: 16, fontWeight: 800, color: "#0B5ED7", letterSpacing: 0.3 }}>PharmaGuard</div>
@@ -559,30 +632,39 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="hide-mobile" style={{ display: "flex", gap: 32, alignItems: "center" }}>
+        {/* Desktop: Nav links — hidden on mobile/tablet */}
+        <div className="nav-desktop-links" style={{ gap: 32, alignItems: "center" }}>
           {[["home", "Home"], ["problem", "Problem"], ["solution", "Solution"], ["feasibility", "Evidence"], ["roadmap", "Roadmap"]].map(([id, label]) => (
             <a key={id} className="nav-link" style={{ color: activeNav === id ? "#0B5ED7" : "#495057" }} onClick={() => { scrollTo(id); setActiveNav(id); }}>{label}</a>
           ))}
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <div className="hide-mobile" style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => navigate("/login")} className="btn-ghost" style={{ fontSize: 12, padding: "9px 20px" }}>
-                Login
-            </button>
-            <button onClick={() => navigate("/register")} className="btn-primary"  style={{ fontSize: 12, padding: "9px 20px" }}>
-                Register
-            </button>
-        </div>
-          <button className="hide-desktop" onClick={() => setMenuOpen(!menuOpen)} style={{ background: "none", border: "1.5px solid rgba(11,94,215,0.35)", borderRadius: 8, width: 40, height: 40, cursor: "pointer", color: "#0B5ED7", fontSize: 18 }}>{menuOpen ? "✕" : "☰"}</button>
+        {/* Desktop: Auth buttons — hidden on mobile/tablet */}
+        <div className="nav-desktop-auth" style={{ gap: 10, alignItems: "center" }}>
+          <button onClick={() => navigate("/login")} className="btn-ghost" style={{ fontSize: 12, padding: "9px 20px" }}>Login</button>
+          <button onClick={() => navigate("/register")} className="btn-primary" style={{ fontSize: 12, padding: "9px 20px" }}>Register</button>
         </div>
 
+        {/* Mobile/Tablet: Hamburger — hidden on desktop */}
+        <button
+          className="nav-hamburger"
+          onClick={() => setMenuOpen(!menuOpen)}
+          style={{ background: "none", border: "1.5px solid rgba(11,94,215,0.35)", borderRadius: 8, width: 40, height: 40, cursor: "pointer", color: "#0B5ED7", fontSize: 18, alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+        >
+          {menuOpen ? "✕" : "☰"}
+        </button>
+
+        {/* Mobile/Tablet: Dropdown Menu with Login + Register */}
         {menuOpen && (
-          <div style={{ position: "absolute", top: 64, left: 0, right: 0, background: "rgba(248,249,250,0.98)", borderBottom: "1px solid rgba(11,94,215,0.12)", padding: 20, display: "flex", flexDirection: "column", gap: 16, backdropFilter: "blur(20px)", boxShadow: "0 8px 32px rgba(11,94,215,0.08)" }}>
+          <div className="mobile-menu">
             {[["home", "Home"], ["problem", "Problem"], ["solution", "Solution"], ["feasibility", "Evidence"], ["roadmap", "Roadmap"]].map(([id, label]) => (
-              <a key={id} className="nav-link" style={{ fontSize: 15 }} onClick={() => { scrollTo(id); setActiveNav(id); }}>{label}</a>
+              <a key={id} className="mobile-menu-link" onClick={() => { scrollTo(id); setActiveNav(id); }}>{label}</a>
             ))}
-            <button className="btn-primary" style={{ justifyContent: "center" }}>Launch App →</button>
+            {/* Auth buttons always present in mobile menu */}
+            <div className="mobile-auth-buttons">
+              <button onClick={() => { navigate("/login"); setMenuOpen(false); }} className="btn-ghost">Login</button>
+              <button onClick={() => { navigate("/register"); setMenuOpen(false); }} className="btn-primary">Register</button>
+            </div>
           </div>
         )}
       </nav>
@@ -607,7 +689,7 @@ export default function Home() {
       <div style={{ position: "relative", zIndex: 1, paddingBottom: 60 }}>
 
         {/* ═══ HERO SECTION ═══════════════════════════════════════════════════ */}
-        <section id="home" style={{ minHeight: "100vh", display: "flex", alignItems: "center", padding: "100px 32px 60px", maxWidth: 1280, margin: "0 auto" }}>
+        <section id="home" className="section-padding" style={{ minHeight: "100vh", display: "flex", alignItems: "center", padding: "100px 32px 60px", maxWidth: 1280, margin: "0 auto" }}>
           <div style={{ width: "100%", display: "flex", gap: 60, alignItems: "center", flexWrap: "wrap" }}>
 
             {/* Left */}
@@ -618,7 +700,7 @@ export default function Home() {
                   CPIC 2024 · Precision Medicine Algorithm
                 </div>
 
-                <h1 className="lora" style={{ fontSize: "clamp(36px,5vw,64px)", fontWeight: 800, lineHeight: 1.05, marginBottom: 24, color: "#0B5ED7" }}>
+                <h1 className="lora" style={{ fontSize: "clamp(32px,5vw,64px)", fontWeight: 800, lineHeight: 1.05, marginBottom: 24, color: "#0B5ED7" }}>
                   The Right Drug.{" "}
                   <span style={{ position: "relative", display: "inline-block" }}>
                     <span style={{ background: "linear-gradient(135deg, #0B5ED7, #20C997)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
@@ -632,12 +714,12 @@ export default function Home() {
                   PharmaGuard decodes patient VCF files using CPIC-validated pharmacogenomic algorithms to predict drug toxicity, efficacy failure, and dosage requirements — before a single pill is prescribed.
                 </p>
 
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 52 }}>
+                <div className="hero-buttons" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 52 }}>
                   <button className="btn-primary">🧬 Analyze Patient VCF</button>
                   <button className="btn-ghost">📋 View Sample Report</button>
                 </div>
 
-                <div style={{ display: "flex", gap: 36, flexWrap: "wrap" }}>
+                <div className="hero-stats" style={{ display: "flex", gap: 36, flexWrap: "wrap" }}>
                   {STATS.map((s) => (
                     <div key={s.label}>
                       <div className="lora" style={{ fontSize: 28, fontWeight: 800, color: s.color, lineHeight: 1 }}>
@@ -652,10 +734,10 @@ export default function Home() {
             </div>
 
             {/* Right: Visual */}
-            <div style={{ flex: "1 1 380px", display: "flex", justifyContent: "center", animation: "fadeUp 0.9s 0.2s cubic-bezier(0.16,1,0.3,1) both" }}>
-              <div style={{ position: "relative", width: 360, height: 420 }}>
+            <div style={{ flex: "1 1 300px", display: "flex", justifyContent: "center", animation: "fadeUp 0.9s 0.2s cubic-bezier(0.16,1,0.3,1) both" }}>
+              <div style={{ position: "relative", width: "min(360px, 100%)", height: 420 }}>
                 {/* Central card */}
-                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 260, background: "#ffffff", border: "1.5px solid rgba(11,94,215,0.2)", borderRadius: 20, padding: 24, backdropFilter: "blur(20px)", boxShadow: "0 12px 60px rgba(11,94,215,0.14)", animation: "float 4s ease-in-out infinite", zIndex: 2 }}>
+                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "min(260px, 85%)", background: "#ffffff", border: "1.5px solid rgba(11,94,215,0.2)", borderRadius: 20, padding: 24, backdropFilter: "blur(20px)", boxShadow: "0 12px 60px rgba(11,94,215,0.14)", animation: "float 4s ease-in-out infinite", zIndex: 2 }}>
                   <div className="scan-line" />
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
                     <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(220,53,69,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>☠️</div>
@@ -696,10 +778,10 @@ export default function Home() {
         </section>
 
         {/* ═══ PROBLEM SECTION ════════════════════════════════════════════════ */}
-        <section id="problem" style={{ padding: "100px 32px", maxWidth: 1280, margin: "0 auto" }}>
+        <section id="problem" className="section-padding" style={{ padding: "100px 32px", maxWidth: 1280, margin: "0 auto" }}>
           <div style={{ maxWidth: 700, marginBottom: 60 }}>
             <SectionLabel>THE PROBLEM</SectionLabel>
-            <h2 className="lora" style={{ fontSize: "clamp(28px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
+            <h2 className="lora" style={{ fontSize: "clamp(26px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
               One-Size-Fits-All Medicine{" "}
               <span style={{ color: "#DC3545" }}>Is Killing Patients.</span>
             </h2>
@@ -708,7 +790,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 20, marginBottom: 60 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 20, marginBottom: 60 }}>
             {PROBLEMS.map((p, i) => (
               <div key={i} className="problem-card" style={{ animationDelay: `${i * 0.1}s` }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 16 }}>
@@ -727,7 +809,7 @@ export default function Home() {
           </div>
 
           {/* Gene impact bars */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(400px,1fr))", gap: 40 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 40 }}>
             <div>
               <div className="lora" style={{ fontSize: 18, fontWeight: 700, color: "#212529", marginBottom: 24 }}>
                 Pharmacogenomic Impact by Gene
@@ -753,11 +835,11 @@ export default function Home() {
         </section>
 
         {/* ═══ SOLUTION SECTION ═══════════════════════════════════════════════ */}
-        <section id="solution" style={{ padding: "100px 32px", background: "rgba(11,94,215,0.03)", borderTop: "1px solid rgba(11,94,215,0.08)", borderBottom: "1px solid rgba(11,94,215,0.08)" }}>
+        <section id="solution" className="section-padding" style={{ padding: "100px 32px", background: "rgba(11,94,215,0.03)", borderTop: "1px solid rgba(11,94,215,0.08)", borderBottom: "1px solid rgba(11,94,215,0.08)" }}>
           <div style={{ maxWidth: 1280, margin: "0 auto" }}>
             <div style={{ maxWidth: 700, marginBottom: 60 }}>
               <SectionLabel>OUR SOLUTION</SectionLabel>
-              <h2 className="lora" style={{ fontSize: "clamp(28px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
+              <h2 className="lora" style={{ fontSize: "clamp(26px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
                 Precision Medicine,{" "}
                 <span style={{ background: "linear-gradient(135deg,#0B5ED7,#20C997)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                   Instant Insights.
@@ -768,7 +850,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 20, marginBottom: 80 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 20, marginBottom: 80 }}>
               {SOLUTIONS.map((s, i) => (
                 <div key={i} className="solution-card">
                   <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
@@ -786,19 +868,18 @@ export default function Home() {
               <div className="lora" style={{ fontSize: 22, fontWeight: 800, color: "#212529", marginBottom: 36, textAlign: "center" }}>
                 How PharmaGuard Works
               </div>
-              <div style={{ display: "flex", gap: 0, flexWrap: "wrap", justifyContent: "center", background: "#ffffff", borderRadius: 16, border: "1px solid rgba(11,94,215,0.1)", overflow: "hidden", boxShadow: "0 4px 24px rgba(11,94,215,0.07)" }}>
+              <div className="how-it-works-grid" style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", background: "#ffffff", borderRadius: 16, border: "1px solid rgba(11,94,215,0.1)", overflow: "hidden", boxShadow: "0 4px 24px rgba(11,94,215,0.07)" }}>
                 {[
                   { step: "01", icon: "📁", title: "Upload VCF", desc: "Drag & drop patient .vcf file from any sequencer — Illumina DRAGEN, PacBio, or Oxford Nanopore", color: "#0B5ED7" },
                   { step: "02", icon: "🔬", title: "Parse & Map", desc: "Real-time extraction of PGx variants (rsIDs, diplotypes) across CYP2D6, CYP2C19, TPMT, DPYD, and 11 more genes", color: "#20C997" },
                   { step: "03", icon: "⚡", title: "CPIC Analysis", desc: "Genotype → Phenotype translation using CPIC 2024 guidelines, diplotype star allele classification, and evidence grading", color: "#6EA8FE" },
                   { step: "04", icon: "📊", title: "Risk Report", desc: "Four-tier risk classification (Toxic/Adjust/Ineffective/Safe) with confidence scores, alternative drugs, and clinical rationale", color: "#f59e0b" },
                 ].map((step, i) => (
-                  <div key={i} style={{ flex: "1 1 200px", padding: "28px 24px", position: "relative", borderRight: i < 3 ? "1px solid rgba(11,94,215,0.08)" : "none" }}>
+                  <div key={i} style={{ flex: "1 1 200px", minWidth: 200, padding: "28px 24px", position: "relative", borderRight: i < 3 ? "1px solid rgba(11,94,215,0.08)" : "none" }}>
                     <div className="mono" style={{ fontSize: 11, color: step.color, letterSpacing: 2, marginBottom: 12 }}>STEP {step.step}</div>
                     <div style={{ fontSize: 36, marginBottom: 12 }}>{step.icon}</div>
                     <div className="lora" style={{ fontSize: 15, fontWeight: 700, color: "#212529", marginBottom: 10 }}>{step.title}</div>
                     <p style={{ fontSize: 13, lineHeight: 1.7, color: "#495057" }}>{step.desc}</p>
-                    {i < 3 && <div style={{ position: "absolute", top: "50%", right: -10, width: 20, height: 20, background: "#F8F9FA", border: `1.5px solid ${step.color}40`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2 }} className="hide-mobile"><span style={{ fontSize: 10, color: step.color }}>→</span></div>}
                   </div>
                 ))}
               </div>
@@ -807,16 +888,16 @@ export default function Home() {
         </section>
 
         {/* ═══ GENE-DRUG DATABASE ══════════════════════════════════════════════ */}
-        <section style={{ padding: "100px 32px", maxWidth: 1280, margin: "0 auto" }}>
+        <section className="section-padding" style={{ padding: "100px 32px", maxWidth: 1280, margin: "0 auto" }}>
           <div style={{ maxWidth: 700, marginBottom: 60 }}>
             <SectionLabel>PGx COVERAGE</SectionLabel>
-            <h2 className="lora" style={{ fontSize: "clamp(28px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
+            <h2 className="lora" style={{ fontSize: "clamp(26px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
               15+ Pharmacogenes.<br />60+ Drugs. All CPIC-Validated.
             </h2>
           </div>
 
-          <div style={{ overflowX: "auto", marginBottom: 40 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640, background: "#ffffff", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 16px rgba(11,94,215,0.07)", border: "1px solid rgba(11,94,215,0.1)" }}>
+          <div style={{ overflowX: "auto", marginBottom: 40, WebkitOverflowScrolling: "touch" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 600, background: "#ffffff", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 16px rgba(11,94,215,0.07)", border: "1px solid rgba(11,94,215,0.1)" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(11,94,215,0.12)", background: "rgba(11,94,215,0.04)" }}>
                   {["Pharmacogene", "Key Drugs", "Clinical Impact", "Population at Risk"].map((h) => (
@@ -850,11 +931,11 @@ export default function Home() {
         </section>
 
         {/* ═══ EVIDENCE / FEASIBILITY ══════════════════════════════════════════ */}
-        <section id="feasibility" style={{ padding: "100px 32px", background: "rgba(32,201,151,0.03)", borderTop: "1px solid rgba(32,201,151,0.1)", borderBottom: "1px solid rgba(32,201,151,0.1)" }}>
+        <section id="feasibility" className="section-padding" style={{ padding: "100px 32px", background: "rgba(32,201,151,0.03)", borderTop: "1px solid rgba(32,201,151,0.1)", borderBottom: "1px solid rgba(32,201,151,0.1)" }}>
           <div style={{ maxWidth: 1280, margin: "0 auto" }}>
             <div style={{ maxWidth: 700, marginBottom: 60 }}>
               <SectionLabel>EVIDENCE & FEASIBILITY</SectionLabel>
-              <h2 className="lora" style={{ fontSize: "clamp(28px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
+              <h2 className="lora" style={{ fontSize: "clamp(26px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
                 Backed by{" "}
                 <span style={{ color: "#0B5ED7" }}>Peer-Reviewed Science.</span>
               </h2>
@@ -864,7 +945,7 @@ export default function Home() {
             </div>
 
             {/* Key metrics */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16, marginBottom: 60 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16, marginBottom: 60 }}>
               {FEASIBILITY.map((f, i) => (
                 <div key={i} style={{ background: "#ffffff", border: "1px solid rgba(11,94,215,0.1)", borderRadius: 14, padding: "20px 22px", transition: "all 0.25s", boxShadow: "0 2px 10px rgba(11,94,215,0.05)" }} onMouseEnter={e => { e.currentTarget.style.borderColor = `${f.color}40`; e.currentTarget.style.boxShadow = `0 6px 24px ${f.color}15`; }} onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(11,94,215,0.1)"; e.currentTarget.style.boxShadow = "0 2px 10px rgba(11,94,215,0.05)"; }}>
                   <div style={{ fontSize: 12, color: "#868e96", marginBottom: 8 }}>{f.label}</div>
@@ -880,7 +961,7 @@ export default function Home() {
             <div className="lora" style={{ fontSize: 22, fontWeight: 800, color: "#212529", marginBottom: 28 }}>
               Key Research Supporting PharmaGuard
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(360px,1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 16 }}>
               {ARTICLES.map((a, i) => (
                 <div key={i} className="article-card">
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
@@ -899,7 +980,7 @@ export default function Home() {
             {/* Big quote */}
             <div style={{ marginTop: 60, padding: "40px", background: "#ffffff", border: "1.5px solid rgba(11,94,215,0.15)", borderRadius: 20, position: "relative", overflow: "hidden", boxShadow: "0 4px 32px rgba(11,94,215,0.08)" }}>
               <div style={{ fontSize: 80, color: "rgba(11,94,215,0.07)", position: "absolute", top: -10, left: 20, fontFamily: "serif", lineHeight: 1 }}>"</div>
-              <div style={{ fontSize: "clamp(16px,2.5vw,22px)", color: "#343a40", lineHeight: 1.7, fontStyle: "italic", position: "relative", zIndex: 1, marginBottom: 20 }}>
+              <div style={{ fontSize: "clamp(15px,2.5vw,22px)", color: "#343a40", lineHeight: 1.7, fontStyle: "italic", position: "relative", zIndex: 1, marginBottom: 20 }}>
                 Implementing preemptive pharmacogenomic testing in primary care reduced clinically significant adverse drug events by <strong style={{ color: "#0B5ED7" }}>30.3%</strong> and improved the proportion of optimal drug prescribing from 43.7% to <strong style={{ color: "#0B5ED7" }}>78.9%</strong> — demonstrating that population-scale PGx is both feasible and cost-effective.
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -914,10 +995,10 @@ export default function Home() {
         </section>
 
         {/* ═══ ABOUT THE PROJECT ══════════════════════════════════════════════ */}
-        <section id="about" style={{ padding: "100px 32px", maxWidth: 1280, margin: "0 auto" }}>
+        <section id="about" className="section-padding" style={{ padding: "100px 32px", maxWidth: 1280, margin: "0 auto" }}>
           <div style={{ maxWidth: 700, marginBottom: 60 }}>
             <SectionLabel>ABOUT THE PROJECT</SectionLabel>
-            <h2 className="lora" style={{ fontSize: "clamp(28px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
+            <h2 className="lora" style={{ fontSize: "clamp(26px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
               Building the Future of{" "}
               <span style={{ background: "linear-gradient(135deg,#0B5ED7,#20C997)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 Precision Prescribing
@@ -925,7 +1006,7 @@ export default function Home() {
             </h2>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 40, marginBottom: 60 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 40, marginBottom: 60 }}>
             <div>
               <div className="lora" style={{ fontSize: 18, fontWeight: 700, color: "#212529", marginBottom: 20 }}>What We Built</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -975,17 +1056,17 @@ export default function Home() {
         </section>
 
         {/* ═══ ROADMAP ════════════════════════════════════════════════════════ */}
-        <section id="roadmap" style={{ padding: "100px 32px", background: "rgba(110,168,254,0.04)", borderTop: "1px solid rgba(110,168,254,0.12)", borderBottom: "1px solid rgba(110,168,254,0.12)" }}>
+        <section id="roadmap" className="section-padding" style={{ padding: "100px 32px", background: "rgba(110,168,254,0.04)", borderTop: "1px solid rgba(110,168,254,0.12)", borderBottom: "1px solid rgba(110,168,254,0.12)" }}>
           <div style={{ maxWidth: 1280, margin: "0 auto" }}>
             <div style={{ maxWidth: 700, marginBottom: 60 }}>
               <SectionLabel>ROADMAP</SectionLabel>
-              <h2 className="lora" style={{ fontSize: "clamp(28px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
+              <h2 className="lora" style={{ fontSize: "clamp(26px,4vw,48px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
                 From Prototype to{" "}
                 <span style={{ color: "#0B5ED7" }}>Clinical Standard.</span>
               </h2>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 20 }}>
               {ROADMAP.map((phase, i) => (
                 <div key={i} style={{ background: "#ffffff", border: `1.5px solid ${phase.status === "active" ? phase.color + "45" : "rgba(11,94,215,0.1)"}`, borderRadius: 16, padding: 24, position: "relative", overflow: "hidden", boxShadow: phase.status === "active" ? `0 4px 24px ${phase.color}18` : "0 2px 10px rgba(11,94,215,0.05)" }}>
                   {phase.status === "active" && (
@@ -1025,13 +1106,13 @@ export default function Home() {
         {/* ═══ CTA ════════════════════════════════════════════════════════════ */}
         <section style={{ padding: "100px 32px" }}>
           <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
-            <div style={{ position: "relative", padding: "60px 40px", background: "linear-gradient(145deg, #ffffff, rgba(11,94,215,0.04))", border: "1.5px solid rgba(11,94,215,0.15)", borderRadius: 24, overflow: "hidden", boxShadow: "0 8px 48px rgba(11,94,215,0.1)" }}>
+            <div className="cta-section" style={{ position: "relative", padding: "60px 40px", background: "linear-gradient(145deg, #ffffff, rgba(11,94,215,0.04))", border: "1.5px solid rgba(11,94,215,0.15)", borderRadius: 24, overflow: "hidden", boxShadow: "0 8px 48px rgba(11,94,215,0.1)" }}>
               <div className="scan-line" />
               <div className="badge" style={{ background: "rgba(11,94,215,0.08)", border: "1px solid rgba(11,94,215,0.2)", color: "#0B5ED7", marginBottom: 24, display: "inline-flex" }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#0B5ED7", animation: "pulse 1.5s infinite" }} />
                 Ready to Deploy
               </div>
-              <h2 className="lora" style={{ fontSize: "clamp(28px,4vw,52px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
+              <h2 className="lora" style={{ fontSize: "clamp(26px,4vw,52px)", fontWeight: 800, color: "#212529", lineHeight: 1.1, marginBottom: 20 }}>
                 Stop Guessing.<br />
                 <span style={{ background: "linear-gradient(135deg,#0B5ED7,#20C997)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                   Start Knowing.
@@ -1040,7 +1121,7 @@ export default function Home() {
               <p style={{ fontSize: 16, color: "#495057", lineHeight: 1.8, marginBottom: 36, maxWidth: 520, margin: "0 auto 36px" }}>
                 Upload your first patient VCF and generate a full CPIC-compliant pharmacogenomic risk report in under 3 seconds — no server, no signup, no data leaving the browser.
               </p>
-              <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+              <div className="cta-buttons" style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
                 <button className="btn-primary" style={{ fontSize: 15, padding: "14px 32px" }}>🧬 Launch PharmaGuard</button>
                 <button className="btn-ghost">📋 Download Sample Report</button>
               </div>
@@ -1050,7 +1131,7 @@ export default function Home() {
 
         {/* ─── FOOTER ─────────────────────────────────────────────────────────── */}
         <footer style={{ padding: "40px 32px 72px", borderTop: "1px solid rgba(11,94,215,0.1)", maxWidth: 1280, margin: "0 auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 32, marginBottom: 32 }}>
+          <div className="footer-cols" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 32, marginBottom: 32 }}>
             <div style={{ maxWidth: 320 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg,#0B5ED7,#094bb3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🧬</div>
@@ -1060,7 +1141,7 @@ export default function Home() {
                 Precision Medicine Algorithm for pharmacogenomic drug risk prediction. CPIC Level A validated. Client-side processing. Zero data exposure.
               </p>
             </div>
-            <div style={{ display: "flex", gap: 60, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
               {[
                 { title: "Platform", links: ["Dashboard", "Family Mode", "History", "API Docs"] },
                 { title: "Science", links: ["CPIC Guidelines", "PGx Database", "Gene Coverage", "References"] },
