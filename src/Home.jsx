@@ -701,7 +701,7 @@ export default function Home() {
                 </div>
 
                 <h1 className="lora" style={{ fontSize: "clamp(36px,5vw,64px)", fontWeight: 800, lineHeight: 1.05, marginBottom: 24, color: "#0B5ED7" }}>
-                  The Right Drug{" "}
+                  The Right Drug.{" "}
                   <span style={{ position: "relative", display: "inline-block" }}>
                     <span style={{ background: "linear-gradient(135deg, #0B5ED7, #20C997)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                       The Right Dose
