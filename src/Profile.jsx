@@ -1,15 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-
-// ─── SHARED NAV ITEMS — must match FamilySection exactly ─────────────────────
-const NAV_ITEMS = [
-  { label: "Dashboard",        key: "main",       path: "/analysis",       dot: false },
-  { label: "Family",           key: "family",     path: "/family-section", dot: true  },
-  { label: "Book Technician",  key: "technician", path: "/technician",     dot: false },
-  { label: "History",          key: "history",    path: "/history",        dot: false },
-  { label: "About",            key: "about",      path: "/about",          dot: false },
-  { label: "Profile",          key: "profile",    path: "/profile",        dot: false },
-];
+import Navbar from "./Navbar";
+import Footer from "./Footer";
 
 // ─── ALL_DRUGS (needed by AboutPage) ─────────────────────────────────────────
 const ALL_DRUGS = [
@@ -477,91 +469,6 @@ function AboutPage() {
   );
 }
 
-// ─── SHARED NAVBAR ────────────────────────────────────────────────────────────
-function SharedNavbar({ currentPage, onNavigate, onSidebarOpen }) {
-  const [mobileMenu, setMobileMenu] = useState(false);
-
-  const isActive = (item) => item.key === currentPage;
-
-  const handleNavClick = (item) => {
-    setMobileMenu(false);
-    if (item.key === "history" || item.key === "about" || item.key === "profile") {
-      onNavigate(item.key, null);
-    } else {
-      onNavigate(null, item.path);
-    }
-  };
-
-  return (
-    <nav style={{
-      position:"sticky", top:0, zIndex:100,
-      background:"rgba(255,255,255,0.95)", backdropFilter:"blur(20px)",
-      borderBottom:"1.5px solid rgba(11,94,215,0.1)",
-      padding:"0 24px", display:"flex", alignItems:"center",
-      justifyContent:"space-between", height:62,
-      boxShadow:"0 2px 12px rgba(11,94,215,0.06)"
-    }}>
-      {/* Logo */}
-      <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:9, cursor:"pointer" }} onClick={() => onNavigate(null, "/analysis")}>
-          <div style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,#0B5ED7,#094bb3)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", boxShadow:"0 4px 12px rgba(11,94,215,0.25)" }}>
-            <Icon.Dna />
-          </div>
-          <div>
-            <div style={{ fontFamily:"'Syne',sans-serif", fontSize:16, fontWeight:800, color:"#0B5ED7", letterSpacing:0.3 }}>PharmaGuard</div>
-            <div style={{ fontFamily:"'DM Mono',monospace", fontSize:9, color:"#20C997", letterSpacing:3 }}>PRECISION MEDICINE</div>
-          </div>
-        </div>
-
-        {/* Desktop nav */}
-        <div className="hide-mobile" style={{ display:"flex", gap:2, marginLeft:16 }}>
-          {NAV_ITEMS.map(item => (
-            <button key={item.key}
-              className={`nav-link tab-btn ${isActive(item) ? "active" : ""}`}
-              onClick={() => handleNavClick(item)}
-              style={{ position:"relative", color:isActive(item)?"#0B5ED7":"#495057" }}
-            >
-              {item.label}
-              {item.dot && <span style={{ position:"absolute", top:-6, right:-6, width:7, height:7, borderRadius:"50%", background:"#0B5ED7", boxShadow:"0 0 6px rgba(11,94,215,0.5)" }} />}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Right side */}
-      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-        <button onClick={onSidebarOpen} style={{
-          display:"flex", alignItems:"center", gap:8,
-          background:"rgba(11,94,215,0.06)", border:"1.5px solid rgba(11,94,215,0.14)",
-          borderRadius:10, padding:"6px 12px", cursor:"pointer", transition:"all 0.18s"
-        }}
-          onMouseEnter={e => { e.currentTarget.style.background="rgba(11,94,215,0.1)"; e.currentTarget.style.borderColor="#0B5ED7"; }}
-          onMouseLeave={e => { e.currentTarget.style.background="rgba(11,94,215,0.06)"; e.currentTarget.style.borderColor="rgba(11,94,215,0.14)"; }}
-        >
-          <div style={{ width:26, height:26, borderRadius:"50%", background:"linear-gradient(135deg,#0B5ED7,#20C997)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:800, color:"#fff" }}>DR</div>
-          <span className="hide-mobile" style={{ fontSize:12, fontWeight:600, color:"#212529" }}>Dr. Roberts</span>
-        </button>
-        <button className="hide-desktop pg-btn pg-btn-ghost" style={{ padding:"7px 11px" }} onClick={() => setMobileMenu(!mobileMenu)}>
-          {mobileMenu ? <Icon.X /> : <Icon.Menu />}
-        </button>
-      </div>
-
-      {/* Mobile menu */}
-      {mobileMenu && (
-        <div style={{ position:"absolute", top:62, left:0, right:0, background:"#fff", borderBottom:"1.5px solid rgba(11,94,215,0.1)", padding:14, display:"flex", flexDirection:"column", gap:6, boxShadow:"0 8px 20px rgba(11,94,215,0.08)", zIndex:200 }}>
-          {NAV_ITEMS.map(item => (
-            <button key={item.key} className={`tab-btn ${isActive(item)?"active":""}`}
-              onClick={() => handleNavClick(item)}
-              style={{ textAlign:"left", padding:"9px 12px" }}>
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </nav>
-  );
-}
-
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 function Sidebar({ open, onClose, onNavigate }) {
   if (!open) return null;
@@ -656,37 +563,7 @@ export default function ProfilePage() {
     { initials:"AK", name:"Arjun Kapoor", role:"Lab Scientist", exp:"6 yrs", rating:4.6, badge:"Verified", color:"#f59e0b" },
   ];
 
-  // ─── SHARED FOOTER ────────────────────────────────────────────────────────
-  const Footer = () => (
-    <footer style={{ borderTop:"1.5px solid rgba(11,94,215,0.1)", padding:"40px 24px 28px", maxWidth:1100, margin:"0 auto" }}>
-      <div style={{ background:"rgba(11,94,215,0.04)", border:"1.5px solid rgba(11,94,215,0.12)", borderRadius:12, padding:"14px 18px", marginBottom:16, textAlign:"center" }}>
-        <div style={{ fontSize:12, color:"#6c757d", lineHeight:1.7 }}>
-          <strong style={{ color:"#0B5ED7" }}>Confidence Scores</strong> reflect concordance between detected variants and CPIC guideline evidence tiers. Scores ≥90% indicate Level A evidence.
-        </div>
-      </div>
-      <div style={{ background:"rgba(245,158,11,0.05)", border:"1.5px solid rgba(245,158,11,0.2)", borderRadius:12, padding:"16px 18px", marginBottom:24 }}>
-        <div style={{ fontSize:12, color:"#b45309", fontWeight:700, marginBottom:6, display:"flex", alignItems:"center", gap:6 }}><Icon.AlertTriangle /> Medical Use Limitation Notice</div>
-        <div style={{ fontSize:11, color:"#6c757d", lineHeight:1.8 }}>
-          This tool is intended for clinical decision support and research use only. All pharmacogenomic findings should be interpreted by a qualified healthcare professional.{" "}
-          <strong style={{ color:"#212529" }}>Prescribing decisions must always be made by a licensed clinician.</strong>
-        </div>
-      </div>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:14 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:28, height:28, borderRadius:7, background:"linear-gradient(135deg,#0B5ED7,#094bb3)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff" }}><Icon.Dna /></div>
-          <div>
-            <div className="fraunces" style={{ fontSize:13, fontWeight:800, color:"#212529" }}>PharmaGuard v3.0</div>
-            <div className="mono" style={{ fontSize:9, color:"#6c757d" }}>CPIC Guidelines 2024 · Clinical Decision Support</div>
-          </div>
-        </div>
-        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-          {["Privacy Policy","Terms of Use","Contact","Documentation"].map(l => (
-            <button key={l} className="pg-btn pg-btn-ghost" style={{ fontSize:11, padding:"5px 12px" }}>{l}</button>
-          ))}
-        </div>
-      </div>
-    </footer>
-  );
+  // ─── (Footer removed — use shared Footer component) ──────────────────────
 
   return (
     <div style={{ minHeight:"100vh", background:"#F8F9FA", color:"#212529" }}>
@@ -698,9 +575,17 @@ export default function ProfilePage() {
       <div style={{ position:"relative", zIndex:1 }}>
 
         {/* ─── NAVBAR ──────────────────────────────────────────────────────── */}
-        <SharedNavbar
-          currentPage={page}
-          onNavigate={handleNavigation}
+        <Navbar
+          page={page}
+          step={0}
+          totalPrice={0}
+          onNavClick={(item) => {
+            if (item.key === "history" || item.key === "about" || item.key === "profile") {
+              setPage(item.key);
+            } else {
+              navigate(item.path);
+            }
+          }}
           onSidebarOpen={() => setSidebarOpen(true)}
         />
 
@@ -1011,7 +896,7 @@ export default function ProfilePage() {
           </>
         )}
 
-        {/* ─── FOOTER (shown on all pages) ─────────────────────────────────── */}
+        {/* ─── FOOTER ──────────────────────────────────────────────────────── */}
         <Footer />
 
       </div>

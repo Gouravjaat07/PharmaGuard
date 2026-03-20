@@ -1,7 +1,9 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import Navbar from "./Navbar";
+import Footer from "./Footer";
 
-// ─── REAL VCF PARSER (fully local — no backend) ──────────────────────────────
+// ─── REAL VCF PARSER ──────────────────────────────────────────────────────────
 const parseVCF = async (file) => {
   const text = await file.text();
   const lines = text.split("\n");
@@ -301,7 +303,7 @@ const generateGenericDrug = (drugName) => ({
   references:["Clinical Pharmacogenetics Implementation Consortium"], category:"Medication",
 });
 
-// ─── LOCAL ANALYSIS (no backend) ─────────────────────────────────────────────
+// ─── LOCAL ANALYSIS ───────────────────────────────────────────────────────────
 const runAnalysis = async (fileInfo, drugs) => {
   await new Promise(r => setTimeout(r, 2200));
   const drugResults = {};
@@ -323,12 +325,83 @@ const runAnalysis = async (fileInfo, drugs) => {
     drugs: drugResults,
     summary,
     alert: summary.highRisk.length > 0
-      ? `⚠ CRITICAL ALERT: High toxicity risk for ${summary.highRisk.join(", ")}. Immediate prescriber notification recommended.`
+      ? `CRITICAL ALERT: High toxicity risk for ${summary.highRisk.join(", ")}. Immediate prescriber notification recommended.`
       : summary.ineffective.length > 0
-        ? `⚠ WARNING: Predicted subtherapeutic response for ${summary.ineffective.join(", ")}. Alternative therapy recommended.`
+        ? `WARNING: Predicted subtherapeutic response for ${summary.ineffective.join(", ")}. Alternative therapy recommended.`
         : null,
     vcfQuality:{ parsingSuccess: fileInfo.quality||98.2, variantConfidence:94.1, annotationCoverage:91.7, pgxVariants: fileInfo.pgxGenes?.length||0 },
   };
+};
+
+// ─── MEDICINE IMAGE → DRUG NAME (Claude Vision API) ──────────────────────────
+const detectDrugFromImage = async (imageFile) => {
+  const base64Data = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = () => reject(new Error("Failed to read image"));
+    reader.readAsDataURL(imageFile);
+  });
+
+  const mediaType = imageFile.type || "image/jpeg";
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: mediaType, data: base64Data }
+          },
+          {
+            type: "text",
+            text: `You are a pharmaceutical drug identification expert. Analyze this medicine/drug image carefully.
+
+Identify ALL drug/medicine names visible in the image. Look for:
+- Brand names (e.g., Lipitor, Plavix, Coumadin)
+- Generic names (e.g., Atorvastatin, Clopidogrel, Warfarin)
+- Active ingredients listed on labels
+- Drug names on pill bottles, blister packs, boxes, or packaging
+
+Map any brand names to their generic equivalents from this list of supported drugs:
+${ALL_DRUGS.join(", ")}
+
+Respond ONLY with a JSON object, no other text:
+{
+  "detected_drugs": ["DRUG1", "DRUG2"],
+  "brand_names_found": ["BrandName1"],
+  "confidence": 0.95,
+  "notes": "Brief description of what was seen in the image"
+}
+
+Rules:
+- Only include drugs from the supported list above
+- Use UPPERCASE generic names exactly as shown in the list
+- If no drugs are identified, return empty detected_drugs array
+- confidence should be between 0 and 1`
+          }
+        ]
+      }]
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const text = data.content?.map(b => b.text || "").join("") || "";
+
+  // Parse JSON from response
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("Could not parse drug detection response");
+
+  const parsed = JSON.parse(jsonMatch[0]);
+  return parsed;
 };
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -346,13 +419,12 @@ const SEVERITY_CONFIG = {
   high:     { color:"#ef4444", label:"High"     },
   critical: { color:"#dc2626", label:"Critical" },
 };
-const PHENOTYPE_LABELS = { PM:"Poor Metabolizer", IM:"Intermediate Metabolizer", NM:"Normal Metabolizer", RM:"Rapid Metabolizer", URM:"Ultrarapid Metabolizer", Unknown:"Unknown" };
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const injectStyles = () => {
-  if (document.getElementById("pg-styles-v4")) return;
+  if (document.getElementById("pg-styles-v5")) return;
   const s = document.createElement("style");
-  s.id = "pg-styles-v4";
+  s.id = "pg-styles-v5";
   s.textContent = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700;800;900&family=Syne:wght@600;700;800&display=swap');
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -369,13 +441,16 @@ const injectStyles = () => {
     @keyframes scanLine{0%{top:-2px;}100%{top:100%;}}
     @keyframes slideInRight{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
     @keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
-    @keyframes countUp{from{opacity:0;transform:scale(0.8);}to{opacity:1;transform:scale(1);}}
     @keyframes modalIn{from{opacity:0;transform:scale(0.92);}to{opacity:1;transform:scale(1);}}
+    @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+    @keyframes imgPop{from{opacity:0;transform:scale(0.9);}to{opacity:1;transform:scale(1);}}
+    @keyframes scanPulse{0%,100%{opacity:0.6;}50%{opacity:1;}}
 
     .pg-fadeUp{animation:fadeUp 0.5s ease both;}
     .pg-pulse{animation:pulse 1.8s infinite;}
     .pg-float{animation:float 3s ease-in-out infinite;}
     .pg-glow{animation:glow 2.5s ease-in-out infinite;}
+    .pg-spin{animation:spin 1s linear infinite;}
 
     .pg-btn{display:inline-flex;align-items:center;gap:7px;padding:10px 20px;border-radius:10px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;transition:all 0.18s;position:relative;overflow:hidden;}
     .pg-btn:hover{transform:translateY(-2px);}
@@ -385,6 +460,8 @@ const injectStyles = () => {
     .pg-btn-success{background:linear-gradient(135deg,#20C997,#17a880);color:#fff;box-shadow:0 4px 18px rgba(32,201,151,0.28);}
     .pg-btn-ghost{background:#fff;color:#495057;border:1.5px solid rgba(11,94,215,0.18);}
     .pg-btn-ghost:hover{background:#F8F9FA;color:#0B5ED7;border-color:#0B5ED7;}
+    .pg-btn-img{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;box-shadow:0 4px 18px rgba(124,58,237,0.3);}
+    .pg-btn-img:hover{box-shadow:0 6px 28px rgba(124,58,237,0.45);}
 
     .pg-card{background:#fff;border:1.5px solid rgba(11,94,215,0.1);border-radius:16px;padding:22px;box-shadow:0 2px 12px rgba(11,94,215,0.06);transition:all 0.25s;}
     .pg-card:hover{border-color:rgba(11,94,215,0.2);box-shadow:0 6px 24px rgba(11,94,215,0.1);}
@@ -402,9 +479,16 @@ const injectStyles = () => {
     .drop-zone{transition:all 0.25s;}
     .drop-zone.dragging{border-color:#0B5ED7!important;background:rgba(11,94,215,0.06)!important;transform:scale(1.005);}
 
+    .img-drop-zone{transition:all 0.25s;}
+    .img-drop-zone.dragging{border-color:#7c3aed!important;background:rgba(124,58,237,0.06)!important;transform:scale(1.005);}
+
     .tab-btn{padding:7px 16px;border-radius:8px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;transition:all 0.18s;background:transparent;color:#6c757d;}
     .tab-btn.active{background:rgba(11,94,215,0.1);color:#0B5ED7;}
     .tab-btn:hover:not(.active){background:rgba(11,94,215,0.05);color:#495057;}
+
+    .drug-source-tab{padding:8px 16px;border-radius:9px;border:1.5px solid rgba(11,94,215,0.15);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;transition:all 0.2s;background:transparent;color:#6c757d;}
+    .drug-source-tab.active{background:rgba(11,94,215,0.1);color:#0B5ED7;border-color:#0B5ED7;}
+    .drug-source-tab.img-active{background:rgba(124,58,237,0.1);color:#7c3aed;border-color:#7c3aed;}
 
     .nav-link{transition:all 0.2s;position:relative;cursor:pointer;}
     .nav-link::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;background:#0B5ED7;transform:scaleX(0);transition:transform 0.2s;border-radius:1px;}
@@ -423,8 +507,12 @@ const injectStyles = () => {
     .scan-effect{position:relative;overflow:hidden;}
     .scan-effect::after{content:'';position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(11,94,215,0.5),transparent);animation:scanLine 2.5s linear infinite;}
 
+    .img-scan-effect{position:relative;overflow:hidden;}
+    .img-scan-effect::after{content:'';position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,rgba(124,58,237,0.7),transparent);animation:scanLine 1.8s linear infinite;}
+
     .risk-card-enter{animation:fadeUp 0.45s ease both;}
     .gradient-text{background:linear-gradient(135deg,#0B5ED7,#20C997);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+    .violet-text{background:linear-gradient(135deg,#7c3aed,#0B5ED7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
     .mono{font-family:'DM Mono',monospace;}
     .fraunces{font-family:'Fraunces',serif;}
 
@@ -434,6 +522,12 @@ const injectStyles = () => {
 
     .info-btn{width:26px;height:26px;border-radius:50%;background:rgba(11,94,215,0.07);border:1px solid rgba(11,94,215,0.18);color:#6c757d;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0;}
     .info-btn:hover{background:rgba(11,94,215,0.14);border-color:#0B5ED7;color:#0B5ED7;transform:scale(1.1);}
+
+    .detected-drug-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;background:rgba(124,58,237,0.08);border:1.5px solid rgba(124,58,237,0.25);color:#6d28d9;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.18s;}
+    .detected-drug-chip:hover{background:rgba(124,58,237,0.14);border-color:#7c3aed;}
+    .detected-drug-chip.added{background:rgba(11,94,215,0.1);border-color:#0B5ED7;color:#0B5ED7;}
+
+    .img-preview{width:100%;max-height:200px;object-fit:contain;border-radius:10px;animation:imgPop 0.3s ease;}
 
     @media(max-width:768px){.pg-card{padding:14px;}.hide-mobile{display:none!important;}}
     @media(min-width:769px){.hide-desktop{display:none!important;}}
@@ -454,7 +548,7 @@ const showNotif = (msg, type="info") => {
   el.innerHTML = `<span style="color:${c[type]};margin-right:8px">${type==="success"?"✓":type==="error"?"✗":type==="warning"?"⚠":"ℹ"}</span>${msg}`;
   document.body.appendChild(el);
   clearTimeout(notifTimer);
-  notifTimer = setTimeout(() => el.remove(), 3500);
+  notifTimer = setTimeout(() => el.remove(), 4000);
 };
 
 // ─── JSON BUILDER ─────────────────────────────────────────────────────────────
@@ -502,7 +596,7 @@ function DNALoader() {
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:22,padding:40}}>
       <div style={{position:"relative",width:72,height:80}}>
         {[0,1,2,3,4,5,6,7].map(i=>(
-          <div key={i} style={{position:"absolute",width:11,height:11,borderRadius:"50%",background:i%2===0?"#0B5ED7":"#20C997",left:18+Math.sin(i*0.9)*22,top:i*10,animationDelay:`${i*0.15}s`,boxShadow:i%2===0?"0 0 8px rgba(11,94,215,0.5)":"0 0 8px rgba(32,201,151,0.5)"}}/>
+          <div key={i} style={{position:"absolute",width:11,height:11,borderRadius:"50%",background:i%2===0?"#0B5ED7":"#20C997",left:18+Math.sin(i*0.9)*22,top:i*10,animationDelay:`${i*0.15}s`,animation:"pulse 1.8s infinite",boxShadow:i%2===0?"0 0 8px rgba(11,94,215,0.5)":"0 0 8px rgba(32,201,151,0.5)"}}/>
         ))}
       </div>
       <div style={{textAlign:"center"}}>
@@ -719,47 +813,237 @@ function DetailCard({ drug, data, cfg }) {
   );
 }
 
-// ─── MAIN APP ──────────────────────────────────────────────────────────────────
+// ─── MEDICINE IMAGE UPLOADER COMPONENT ───────────────────────────────────────
+function MedicineImageUploader({ onDrugsDetected, selectedDrugs }) {
+  const [imgDragging, setImgDragging] = useState(false);
+  const [imgFile, setImgFile]         = useState(null);
+  const [imgPreview, setImgPreview]   = useState(null);
+  const [scanning, setScanning]       = useState(false);
+  const [scanResult, setScanResult]   = useState(null);
+  const [scanError, setScanError]     = useState("");
+  const imgInputRef = useRef(null);
+
+  const processImage = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setScanError("Please upload an image file (JPG, PNG, WEBP, etc.)");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setScanError("Image too large — maximum 10MB");
+      return;
+    }
+
+    setImgFile(file);
+    setScanResult(null);
+    setScanError("");
+
+    // Generate preview
+    const reader = new FileReader();
+    reader.onload = (e) => setImgPreview(e.target.result);
+    reader.readAsDataURL(file);
+
+    // Scan with Claude Vision
+    setScanning(true);
+    try {
+      const result = await detectDrugFromImage(file);
+      setScanResult(result);
+      if (result.detected_drugs?.length > 0) {
+        showNotif(`✓ Detected ${result.detected_drugs.length} drug(s) from image`, "success");
+      } else {
+        showNotif("No recognized drugs detected in image — try a clearer photo", "warning");
+      }
+    } catch (err) {
+      setScanError("Drug detection failed: " + err.message);
+      showNotif("Image analysis failed — " + err.message, "error");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleImgDrop = useCallback((e) => {
+    e.preventDefault();
+    setImgDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f) processImage(f);
+  }, []);
+
+  const addDrug = (drug) => {
+    if (!selectedDrugs.includes(drug)) {
+      onDrugsDetected([...selectedDrugs, drug]);
+      showNotif(`Added ${drug} to analysis`, "info");
+    }
+  };
+
+  const addAllDrugs = () => {
+    const newDrugs = scanResult.detected_drugs.filter(d => !selectedDrugs.includes(d));
+    if (newDrugs.length > 0) {
+      onDrugsDetected([...selectedDrugs, ...newDrugs]);
+      showNotif(`Added ${newDrugs.length} drug(s) to analysis`, "success");
+    }
+  };
+
+  const reset = () => {
+    setImgFile(null);
+    setImgPreview(null);
+    setScanResult(null);
+    setScanError("");
+  };
+
+  return (
+    <div>
+      {/* Upload Zone */}
+      {!imgFile && (
+        <div
+          className={`img-drop-zone ${imgDragging ? "dragging" : ""}`}
+          style={{border:`2px dashed rgba(124,58,237,0.35)`,borderRadius:13,padding:"28px 22px",textAlign:"center",cursor:"pointer",background:"rgba(124,58,237,0.02)",transition:"all 0.25s"}}
+          onDragOver={e=>{e.preventDefault();setImgDragging(true);}}
+          onDragLeave={()=>setImgDragging(false)}
+          onDrop={handleImgDrop}
+          onClick={()=>imgInputRef.current?.click()}
+        >
+          <input ref={imgInputRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>processImage(e.target.files[0])}/>
+          <div style={{fontSize:40,marginBottom:10}} className={imgDragging?"pg-float":""}>📷</div>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:5,color:"#212529"}}>Drop a medicine image here</div>
+          <div style={{color:"#6c757d",fontSize:12,marginBottom:14}}>Pill bottles, blister packs, drug packaging, prescriptions · JPG / PNG / WEBP</div>
+          <button className="pg-btn pg-btn-img" style={{fontSize:12}} onClick={e=>{e.stopPropagation();imgInputRef.current?.click();}}>
+            📷 Browse Image
+          </button>
+        </div>
+      )}
+
+      {/* Scanning State */}
+      {imgFile && scanning && (
+        <div className="pg-card img-scan-effect" style={{border:"1.5px solid rgba(124,58,237,0.3)",background:"rgba(124,58,237,0.03)",textAlign:"center",padding:28}}>
+          {imgPreview && <img src={imgPreview} alt="medicine" className="img-preview" style={{marginBottom:18,opacity:0.7}}/>}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:8}}>
+            <div style={{width:22,height:22,borderRadius:"50%",border:"3px solid rgba(124,58,237,0.2)",borderTop:"3px solid #7c3aed",animation:"spin 0.8s linear infinite"}}/>
+            <div style={{fontWeight:700,fontSize:14,color:"#7c3aed"}}>AI Scanning Medicine Image...</div>
+          </div>
+          <div style={{fontSize:12,color:"#6c757d"}}>Claude Vision is identifying drug names from packaging</div>
+          <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:12,flexWrap:"wrap"}}>
+            {["Reading label","Extracting names","Matching database","Validating drugs"].map((s,i)=>(
+              <span key={s} className="pg-badge" style={{background:"rgba(124,58,237,0.08)",color:"#7c3aed",border:"1px solid rgba(124,58,237,0.2)",fontSize:10,animation:`pulse ${1.2+i*0.2}s infinite`}}>⟳ {s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Results */}
+      {imgFile && !scanning && (
+        <div>
+          {/* Image preview strip */}
+          <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:14}}>
+            {imgPreview && (
+              <img src={imgPreview} alt="medicine" style={{width:80,height:80,objectFit:"cover",borderRadius:10,border:"1.5px solid rgba(124,58,237,0.25)",flexShrink:0}}/>
+            )}
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#212529",marginBottom:3}}>{imgFile.name}</div>
+              <div style={{fontSize:11,color:"#6c757d",marginBottom:8}}>{(imgFile.size/1024).toFixed(1)} KB · {imgFile.type}</div>
+              <button className="pg-btn pg-btn-ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={reset}>✕ Remove Image</button>
+            </div>
+          </div>
+
+          {/* Error */}
+          {scanError && (
+            <div style={{padding:"12px 14px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:10,marginBottom:12}}>
+              <div style={{fontSize:12,color:"#ef4444",fontWeight:600,marginBottom:3}}>Detection Failed</div>
+              <div style={{fontSize:11,color:"#6c757d"}}>{scanError}</div>
+            </div>
+          )}
+
+          {/* Detected Drugs */}
+          {scanResult && (
+            <div>
+              {scanResult.detected_drugs?.length > 0 ? (
+                <div style={{background:"rgba(124,58,237,0.04)",border:"1.5px solid rgba(124,58,237,0.2)",borderRadius:12,padding:"14px 16px",marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:700,color:"#6d28d9",marginBottom:2}}>
+                        ✓ {scanResult.detected_drugs.length} Drug{scanResult.detected_drugs.length!==1?"s":""} Detected
+                      </div>
+                      {scanResult.notes && <div style={{fontSize:11,color:"#6c757d"}}>{scanResult.notes}</div>}
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:10,color:"#6c757d",marginBottom:2}}>AI Confidence</div>
+                      <div className="mono" style={{fontSize:14,fontWeight:700,color:"#7c3aed"}}>{Math.round((scanResult.confidence||0)*100)}%</div>
+                    </div>
+                  </div>
+
+                  <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:12}}>
+                    {scanResult.detected_drugs.map(drug=>(
+                      <button
+                        key={drug}
+                        className={`detected-drug-chip ${selectedDrugs.includes(drug)?"added":""}`}
+                        onClick={()=>addDrug(drug)}
+                        title={selectedDrugs.includes(drug)?"Already added — click to add again":"Click to add to analysis"}
+                      >
+                        {selectedDrugs.includes(drug) ? "✓" : "+"} {drug}
+                      </button>
+                    ))}
+                  </div>
+
+                  {scanResult.brand_names_found?.length > 0 && (
+                    <div style={{fontSize:11,color:"#6c757d",marginBottom:10}}>
+                      Brand names found: {scanResult.brand_names_found.join(", ")}
+                    </div>
+                  )}
+
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <button className="pg-btn pg-btn-img" style={{fontSize:12,padding:"8px 16px"}} onClick={addAllDrugs}>
+                      + Add All Detected Drugs
+                    </button>
+                    <button className="pg-btn pg-btn-ghost" style={{fontSize:12,padding:"8px 16px"}} onClick={reset}>
+                      📷 Scan Another Image
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{padding:"14px 16px",background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:10,marginBottom:12}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#f59e0b",marginBottom:4}}>No Recognized Drugs Found</div>
+                  <div style={{fontSize:11,color:"#6c757d",lineHeight:1.6}}>
+                    {scanResult.notes || "The image may not contain readable drug information. Try a clearer photo of the medicine label or packaging."}
+                  </div>
+                  <div style={{marginTop:10,display:"flex",gap:8}}>
+                    <button className="pg-btn pg-btn-ghost" style={{fontSize:11}} onClick={reset}>Try Another Image</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function PharmaGuard() {
   useEffect(() => { injectStyles(); }, []);
   const navigate = useNavigate();
 
-  const [page, setPage] = useState("main");
-  const [file, setFile] = useState(null);
-  const [fileStatus, setFileStatus] = useState(null);
-  const [fileInfo, setFileInfo] = useState(null);
-  const [fileError, setFileError] = useState("");
-  const [dragging, setDragging] = useState(false);
+  const [page, setPage]                 = useState("main");
+  const [file, setFile]                 = useState(null);
+  const [fileStatus, setFileStatus]     = useState(null);
+  const [fileInfo, setFileInfo]         = useState(null);
+  const [fileError, setFileError]       = useState("");
+  const [dragging, setDragging]         = useState(false);
   const [selectedDrugs, setSelectedDrugs] = useState([]);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [results, setResults] = useState(null);
-  const [activeTab, setActiveTab] = useState("cards");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [drugInputMode, setDrugInputMode] = useState("search"); // "search" | "image"
+  const [analyzing, setAnalyzing]       = useState(false);
+  const [results, setResults]           = useState(null);
+  const [activeTab, setActiveTab]       = useState("cards");
+  const [sidebarOpen, setSidebarOpen]   = useState(false);
   const [sidebarContent, setSidebarContent] = useState("history");
-  const [mobileMenu, setMobileMenu] = useState(false);
-  const [drugSearch, setDrugSearch] = useState("");
+  const [drugSearch, setDrugSearch]     = useState("");
   const [exportingPDF, setExportingPDF] = useState(false);
-  const fileInputRef = useRef(null);
-  const drugInputRef = useRef(null);
-
-  const NAV_ITEMS = [
-    { label:"Dashboard",       key:"main",       path:"/analysis",       dot:false, internal:true  },
-    { label:"👨‍👩‍👧‍👦 Family",   key:"family",     path:"/family-section", dot:true,  internal:false },
-    { label:"Book Technician", key:"technician", path:"/technician",     dot:false, internal:false },
-    { label:"History",         key:"history",    path:"/history",        dot:false, internal:true  },
-    { label:"About",           key:"about",      path:"/about",          dot:false, internal:true  },
-    { label:"Profile",         key:"profile",    path:"/profile",        dot:false, internal:false },
-  ];
-
-  const isNavActive = (item) =>
-    (item.key === "main" && page === "main") ||
-    (item.key === "history" && page === "history") ||
-    (item.key === "about" && page === "about");
+  const fileInputRef  = useRef(null);
+  const drugInputRef  = useRef(null);
 
   const handleNavClick = (item) => {
-    setMobileMenu(false);
-    if (item.internal) { setPage(item.key); }
-    else { navigate(item.path); }
+    if (item.key === "main")    { setPage("main");    }
+    if (item.key === "history") { setPage("history"); }
+    if (item.key === "about")   { setPage("about");   }
   };
 
   const filteredDrugs = useMemo(() => {
@@ -768,7 +1052,6 @@ export default function PharmaGuard() {
     return ALL_DRUGS.filter(d => d.includes(q) && !selectedDrugs.includes(d));
   }, [drugSearch, selectedDrugs]);
 
-  // ── Local VCF upload — no backend ────────────────────────────────────────────
   const handleFile = async (f) => {
     if (!f) return;
     setFile(f); setFileStatus("validating"); setResults(null); setSelectedDrugs([]);
@@ -792,7 +1075,6 @@ export default function PharmaGuard() {
     const f = e.dataTransfer.files[0]; if (f) handleFile(f);
   }, []);
 
-  // ── Local analysis — no backend ───────────────────────────────────────────────
   const doAnalysis = async () => {
     if (!fileInfo || selectedDrugs.length === 0) return;
     setAnalyzing(true); setResults(null);
@@ -859,55 +1141,6 @@ export default function PharmaGuard() {
     { id:"H004", date:"2025-01-14", sampleId:"SAMPLE_KL77PQ", drugs:["TAMOXIFEN","VORICONAZOLE"], highRiskCount:1, status:"Complete", sampleCount:1108 },
   ];
 
-  // ── NAV BAR ───────────────────────────────────────────────────────────────────
-  const NavBar = () => (
-    <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(20px)",borderBottom:"1.5px solid rgba(11,94,215,0.1)",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",height:62,boxShadow:"0 2px 12px rgba(11,94,215,0.06)"}}>
-      {/* Logo */}
-      <div style={{display:"flex",alignItems:"center",gap:14}}>
-        <div style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer"}} onClick={()=>setPage("main")}>
-          <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#0B5ED7,#094bb3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,boxShadow:"0 4px 12px rgba(11,94,215,0.25)"}}>🧬</div>
-          <div>
-            <div style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:800,color:"#0B5ED7",letterSpacing:0.3}}>PharmaGuard</div>
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#20C997",letterSpacing:3}}>PRECISION MEDICINE</div>
-          </div>
-        </div>
-        {/* Desktop nav */}
-        <div className="hide-mobile" style={{display:"flex",gap:2,marginLeft:16}}>
-          {NAV_ITEMS.map(item=>(
-            <button key={item.key}
-              className={`nav-link tab-btn ${isNavActive(item)?"active":""}`}
-              onClick={()=>handleNavClick(item)}
-              style={{position:"relative",color:isNavActive(item)?"#0B5ED7":"#495057"}}
-            >
-              {item.label}
-              {item.dot && <span style={{position:"absolute",top:-6,right:-6,width:8,height:8,borderRadius:"50%",background:"#0B5ED7",boxShadow:"0 0 6px rgba(11,94,215,0.5)"}}/>}
-            </button>
-          ))}
-        </div>
-      </div>
-      {/* Right side */}
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <button onClick={()=>openSidebar("profile")} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(11,94,215,0.06)",border:"1.5px solid rgba(11,94,215,0.14)",borderRadius:10,padding:"6px 12px",cursor:"pointer",transition:"all 0.18s"}}
-          onMouseEnter={e=>{e.currentTarget.style.background="rgba(11,94,215,0.1)";e.currentTarget.style.borderColor="#0B5ED7";}}
-          onMouseLeave={e=>{e.currentTarget.style.background="rgba(11,94,215,0.06)";e.currentTarget.style.borderColor="rgba(11,94,215,0.14)";}}>
-          <div style={{width:26,height:26,borderRadius:"50%",background:"linear-gradient(135deg,#0B5ED7,#20C997)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#fff"}}>DR</div>
-          <span className="hide-mobile" style={{fontSize:12,fontWeight:600,color:"#212529"}}>Dr. Roberts</span>
-        </button>
-        <button className="hide-desktop pg-btn pg-btn-ghost" style={{padding:"7px 11px"}} onClick={()=>setMobileMenu(!mobileMenu)}>{mobileMenu?"✕":"☰"}</button>
-      </div>
-      {/* Mobile menu */}
-      {mobileMenu && (
-        <div style={{position:"absolute",top:62,left:0,right:0,background:"#fff",borderBottom:"1.5px solid rgba(11,94,215,0.1)",padding:14,display:"flex",flexDirection:"column",gap:6,boxShadow:"0 8px 20px rgba(11,94,215,0.08)",zIndex:200}}>
-          {NAV_ITEMS.map(item=>(
-            <button key={item.key} className={`tab-btn ${isNavActive(item)?"active":""}`} onClick={()=>handleNavClick(item)} style={{textAlign:"left",padding:"9px 12px"}}>
-              {item.label}{item.dot&&<span style={{marginLeft:6,width:6,height:6,borderRadius:"50%",background:"#0B5ED7",display:"inline-block"}}/>}
-            </button>
-          ))}
-        </div>
-      )}
-    </nav>
-  );
-
   // ── SIDEBAR ───────────────────────────────────────────────────────────────────
   const Sidebar = () => (
     <>
@@ -936,7 +1169,7 @@ export default function PharmaGuard() {
               ))}
             </div>
             <button className="pg-btn pg-btn-primary" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={()=>{setSidebarOpen(false);navigate("/family-section");}}>
-              👨‍👩‍👧‍👦 Go to Family Dashboard
+              Family Dashboard
             </button>
             <button className="pg-btn pg-btn-ghost" style={{width:"100%",justifyContent:"center"}} onClick={()=>{setSidebarOpen(false);navigate("/technician");}}>
               🔬 Book Lab Technician
@@ -955,26 +1188,6 @@ export default function PharmaGuard() {
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <span className="pg-badge" style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"1px solid rgba(239,68,68,0.25)",fontSize:10}}>{h.highRiskCount} High Risk</span>
                   <button className="pg-btn pg-btn-ghost" style={{padding:"4px 9px",fontSize:10}}>View</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {sidebarContent==="notifications" && (
-          <div style={{display:"flex",flexDirection:"column",gap:9}}>
-            {[
-              {icon:"🔔",msg:"New CPIC guideline update for CYP2D6 — October 2024",time:"2h ago"},
-              {icon:"⚠️",msg:"Patient risk alert: Warfarin + CYP2C9*3 interaction",time:"5h ago"},
-              {icon:"✅",msg:"Analysis for SAMPLE_AB12CD complete — 1 critical risk",time:"1d ago"},
-              {icon:"📋",msg:"DPWG Fluoropyrimidine guidelines updated",time:"3d ago"},
-            ].map((n,i)=>(
-              <div key={i} className="pg-card" style={{padding:"11px 13px"}}>
-                <div style={{display:"flex",gap:9}}>
-                  <span style={{fontSize:18}}>{n.icon}</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:12,color:"#212529",marginBottom:3,lineHeight:1.5}}>{n.msg}</div>
-                    <div style={{fontSize:10,color:"#6c757d"}}>{n.time}</div>
-                  </div>
                 </div>
               </div>
             ))}
@@ -1022,11 +1235,18 @@ export default function PharmaGuard() {
         <div style={{fontSize:56,marginBottom:14}}>🧬</div>
         <div className="fraunces" style={{fontSize:34,fontWeight:900,marginBottom:10,color:"#212529"}}>PharmaGuard</div>
         <div style={{color:"#6c757d",fontSize:14,lineHeight:1.8,maxWidth:540,margin:"0 auto"}}>
-          Clinical-grade pharmacogenomic analysis platform powered by CPIC guidelines. Upload patient VCF files to predict drug response, detect toxicity risks, and optimize therapeutic decisions with evidence-based precision.
+          Clinical-grade pharmacogenomic analysis platform powered by CPIC guidelines. Upload patient VCF files and medicine images to predict drug response, detect toxicity risks, and optimize therapeutic decisions.
         </div>
       </div>
       <div className="grid-3" style={{marginBottom:22}}>
-        {[{icon:"🧬",title:"PGx Analysis",desc:"CPIC Level A variant detection across 50+ drugs"},{icon:"🛡️",title:"Risk Detection",desc:"Real-time toxicity and efficacy risk scoring"},{icon:"💊",title:"Drug Guidance",desc:"Evidence-based dosage & validated alternatives"},{icon:"📋",title:"Clinical Reports",desc:"Export-ready JSON, CSV, and PDF summaries"},{icon:"🔒",title:"100% Local",desc:"Your genomic data never leaves your browser"},{icon:"⚡",title:"Real-time",desc:"Sub-3 second pharmacogenomic analysis"}].map(f=>(
+        {[
+          {icon:"🧬",title:"PGx Analysis",desc:"CPIC Level A variant detection across 50+ drugs"},
+          {icon:"📷",title:"Medicine Image Scan",desc:"AI-powered drug identification from medicine photos"},
+          {icon:"🛡️",title:"Risk Detection",desc:"Real-time toxicity and efficacy risk scoring"},
+          {icon:"💊",title:"Drug Guidance",desc:"Evidence-based dosage & validated alternatives"},
+          {icon:"📋",title:"Clinical Reports",desc:"Export-ready JSON, CSV, and PDF summaries"},
+          {icon:"🔒",title:"100% Local",desc:"Your genomic data never leaves your browser"},
+        ].map(f=>(
           <div key={f.title} className="pg-card">
             <div style={{fontSize:26,marginBottom:8}}>{f.icon}</div>
             <div style={{fontWeight:700,marginBottom:5,fontSize:13,color:"#212529"}}>{f.title}</div>
@@ -1057,7 +1277,7 @@ export default function PharmaGuard() {
           Patient Genetic<br/><span className="gradient-text">Drug Risk Analysis</span>
         </div>
         <div style={{color:"#6c757d",fontSize:14,maxWidth:500,margin:"0 auto",lineHeight:1.7}}>
-          Upload patient VCF files to analyze pharmacogenomic variants and generate evidence-based drug risk predictions with clinical recommendations.
+          Upload patient VCF files and scan medicine images to analyze pharmacogenomic variants and generate evidence-based drug risk predictions.
         </div>
       </div>
 
@@ -1070,7 +1290,7 @@ export default function PharmaGuard() {
         ))}
       </div>
 
-      {/* STEP 1 — Upload */}
+      {/* STEP 1 — Upload VCF */}
       <div className="pg-card pg-fadeUp" style={{marginBottom:20,animationDelay:"0.1s"}}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
           <div style={{width:30,height:30,borderRadius:8,background:"linear-gradient(135deg,#0B5ED7,#094bb3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:"#fff"}}>1</div>
@@ -1143,31 +1363,76 @@ export default function PharmaGuard() {
         )}
       </div>
 
-      {/* STEP 2 — Drug Selection */}
+      {/* STEP 2 — Drug Selection (Search OR Image) */}
       {fileStatus==="valid" && (
         <div className="pg-card pg-fadeUp" style={{marginBottom:20}}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
             <div style={{width:30,height:30,borderRadius:8,background:"linear-gradient(135deg,#0B5ED7,#094bb3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:"#fff"}}>2</div>
-            <div>
+            <div style={{flex:1}}>
               <div style={{fontWeight:700,fontSize:15,color:"#212529"}}>Select Drugs to Analyze</div>
-              <div style={{fontSize:11,color:"#6c757d"}}>{ALL_DRUGS.length}+ drugs — type to search</div>
+              <div style={{fontSize:11,color:"#6c757d"}}>Search by name or upload a medicine image for automatic detection</div>
             </div>
           </div>
-          <input ref={drugInputRef} className="pg-input" placeholder="🔍 Search drug (e.g. Warfarin, Codeine, Metoprolol...)" value={drugSearch} onChange={e=>setDrugSearch(e.target.value)} style={{marginBottom:12}}/>
-          {filteredDrugs.length > 0 && (
-            <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
-              {filteredDrugs.slice(0,60).map(d=>(
-                <button key={d} className="pg-btn pg-btn-ghost" style={{fontSize:11,padding:"5px 11px",borderRadius:7}}
-                  onClick={()=>{setSelectedDrugs(p=>[...p,d]);setDrugSearch("");setTimeout(()=>drugInputRef.current?.focus(),10);}}>
-                  + {d}
-                </button>
-              ))}
-              {filteredDrugs.length>60&&<span style={{fontSize:11,color:"#6c757d",alignSelf:"center"}}>+{filteredDrugs.length-60} more</span>}
+
+          {/* Mode Toggle */}
+          <div style={{display:"flex",gap:8,marginBottom:18}}>
+            <button
+              className={`drug-source-tab ${drugInputMode==="search"?"active":""}`}
+              onClick={()=>setDrugInputMode("search")}
+            >
+              🔍 Search by Name
+            </button>
+            <button
+              className={`drug-source-tab ${drugInputMode==="image"?"img-active":""}`}
+              onClick={()=>setDrugInputMode("image")}
+            >
+              📷 Scan Medicine Image
+              <span style={{marginLeft:6,padding:"1px 6px",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",color:"#fff",borderRadius:4,fontSize:9,fontWeight:700}}>AI</span>
+            </button>
+          </div>
+
+          {/* Search Mode */}
+          {drugInputMode==="search" && (
+            <div>
+              <input ref={drugInputRef} className="pg-input" placeholder="Search drug (e.g. Warfarin, Codeine, Metoprolol...)" value={drugSearch} onChange={e=>setDrugSearch(e.target.value)} style={{marginBottom:12}}/>
+              {filteredDrugs.length > 0 && (
+                <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+                  {filteredDrugs.slice(0,60).map(d=>(
+                    <button key={d} className="pg-btn pg-btn-ghost" style={{fontSize:11,padding:"5px 11px",borderRadius:7}}
+                      onClick={()=>{setSelectedDrugs(p=>[...p,d]);setDrugSearch("");setTimeout(()=>drugInputRef.current?.focus(),10);}}>
+                      + {d}
+                    </button>
+                  ))}
+                  {filteredDrugs.length>60&&<span style={{fontSize:11,color:"#6c757d",alignSelf:"center"}}>+{filteredDrugs.length-60} more</span>}
+                </div>
+              )}
+              {drugSearch && filteredDrugs.length===0 && <div style={{textAlign:"center",padding:18,color:"#6c757d",fontSize:12}}>No matches for "{drugSearch}"</div>}
             </div>
           )}
-          {selectedDrugs.length > 0 && (
+
+          {/* Image Scan Mode */}
+          {drugInputMode==="image" && (
             <div>
-              <div style={{fontSize:10,color:"#6c757d",marginBottom:7,letterSpacing:1.2,fontWeight:600}}>SELECTED ({selectedDrugs.length})</div>
+              {/* How it works banner */}
+              <div style={{padding:"10px 14px",background:"rgba(124,58,237,0.06)",border:"1px solid rgba(124,58,237,0.2)",borderRadius:10,marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:18}}>✨</span>
+                <div style={{fontSize:12,color:"#6d28d9",lineHeight:1.5}}>
+                  <strong>How it works:</strong> Upload a photo of any medicine — pill bottle, blister pack, or prescription — and AI will automatically identify the drug name and add it to your analysis list.
+                </div>
+              </div>
+              <MedicineImageUploader
+                selectedDrugs={selectedDrugs}
+                onDrugsDetected={setSelectedDrugs}
+              />
+            </div>
+          )}
+
+          {/* Selected drugs (shown in both modes) */}
+          {selectedDrugs.length > 0 && (
+            <div style={{marginTop:16,paddingTop:16,borderTop:"1.5px solid rgba(11,94,215,0.08)"}}>
+              <div style={{fontSize:10,color:"#6c757d",marginBottom:8,letterSpacing:1.2,fontWeight:600}}>
+                SELECTED FOR ANALYSIS ({selectedDrugs.length})
+              </div>
               <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
                 {selectedDrugs.map(d=>(
                   <span key={d} className="pg-badge" style={{background:"rgba(11,94,215,0.1)",color:"#0B5ED7",border:"1px solid rgba(11,94,215,0.25)",fontSize:12,cursor:"pointer",padding:"5px 11px"}} onClick={()=>setSelectedDrugs(p=>p.filter(x=>x!==d))}>
@@ -1175,9 +1440,9 @@ export default function PharmaGuard() {
                   </span>
                 ))}
               </div>
+              <div style={{marginTop:10,fontSize:11,color:"#6c757d"}}>Click a drug chip to remove it</div>
             </div>
           )}
-          {drugSearch && filteredDrugs.length===0 && <div style={{textAlign:"center",padding:18,color:"#6c757d",fontSize:12}}>No matches for "{drugSearch}"</div>}
         </div>
       )}
 
@@ -1192,6 +1457,7 @@ export default function PharmaGuard() {
             {analyzing?"⟳ Analyzing...":"🔬 Run Pharmacogenomic Analysis"}
           </button>
           {selectedDrugs.length===0&&<div style={{fontSize:11,color:"#6c757d",marginTop:7}}>Select at least one drug to continue</div>}
+          {selectedDrugs.length>0&&<div style={{fontSize:11,color:"#6c757d",marginTop:7}}>{selectedDrugs.length} drug{selectedDrugs.length!==1?"s":""} queued · CPIC 2024 guidelines</div>}
         </div>
       )}
 
@@ -1202,7 +1468,7 @@ export default function PharmaGuard() {
         <div id="results-section">
           {results.alert && (
             <div className="pg-fadeUp" style={{padding:"14px 18px",borderRadius:13,marginBottom:18,background:results.summary.highRisk.length>0?"rgba(220,38,38,0.08)":"rgba(245,158,11,0.08)",border:`1px solid ${results.summary.highRisk.length>0?"rgba(220,38,38,0.3)":"rgba(245,158,11,0.3)"}`,display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:22}}>🚨</span>
+              <span style={{fontSize:22}}>⚠️</span>
               <div>
                 <div style={{fontWeight:700,color:results.summary.highRisk.length>0?"#dc2626":"#f59e0b",fontSize:13}}>Clinical Alert</div>
                 <div style={{fontSize:12,color:"#495057",lineHeight:1.5}}>{results.alert}</div>
@@ -1324,46 +1590,23 @@ export default function PharmaGuard() {
   // ── RENDER ────────────────────────────────────────────────────────────────────
   return (
     <div style={{minHeight:"100vh",background:"#F8F9FA",color:"#212529"}}>
-      {/* Background grid */}
       <div style={{position:"fixed",inset:0,zIndex:0,pointerEvents:"none",backgroundImage:"radial-gradient(rgba(11,94,215,0.06) 1px,transparent 1px)",backgroundSize:"30px 30px"}}/>
       <div style={{position:"fixed",top:-300,right:-200,width:700,height:700,borderRadius:"50%",background:"radial-gradient(circle,rgba(11,94,215,0.05),transparent 70%)",zIndex:0,pointerEvents:"none"}}/>
       <div style={{position:"fixed",bottom:-200,left:-100,width:500,height:500,borderRadius:"50%",background:"radial-gradient(circle,rgba(32,201,151,0.04),transparent 70%)",zIndex:0,pointerEvents:"none"}}/>
 
       <div style={{position:"relative",zIndex:1}}>
-        <NavBar/>
+        <Navbar
+          page={page}
+          step={0}
+          totalPrice={0}
+          onNavClick={handleNavClick}
+          onSidebarOpen={() => openSidebar("profile")}
+        />
         {page==="main"    && <MainPage/>}
         {page==="history" && <HistoryPage/>}
         {page==="about"   && <AboutPage/>}
         <Sidebar/>
-
-        {/* Footer */}
-        <footer style={{borderTop:"1.5px solid rgba(11,94,215,0.1)",padding:"40px 24px 28px",maxWidth:1100,margin:"0 auto"}}>
-          <div style={{background:"rgba(11,94,215,0.04)",border:"1.5px solid rgba(11,94,215,0.12)",borderRadius:12,padding:"14px 18px",marginBottom:16,textAlign:"center"}}>
-            <div style={{fontSize:12,color:"#6c757d",lineHeight:1.7}}>
-              <strong style={{color:"#0B5ED7"}}>Confidence Scores</strong> reflect concordance between detected variants and CPIC guideline evidence tiers. Scores ≥90% indicate Level A evidence.
-            </div>
-          </div>
-          <div style={{background:"rgba(245,158,11,0.05)",border:"1.5px solid rgba(245,158,11,0.2)",borderRadius:12,padding:"16px 18px",marginBottom:24}}>
-            <div style={{fontSize:12,color:"#b45309",fontWeight:700,marginBottom:6}}>⚕️ Medical Use Limitation Notice</div>
-            <div style={{fontSize:11,color:"#6c757d",lineHeight:1.8}}>
-              This tool is intended for clinical decision support and research use only. <strong style={{color:"#212529"}}>It must not replace professional medical judgment.</strong> All pharmacogenomic findings should be interpreted by a qualified healthcare professional.
-            </div>
-          </div>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14}}>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <div style={{width:28,height:28,borderRadius:7,background:"linear-gradient(135deg,#0B5ED7,#094bb3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>🧬</div>
-              <div>
-                <div className="fraunces" style={{fontSize:13,fontWeight:800,color:"#212529"}}>PharmaGuard v3.0</div>
-                <div className="mono" style={{fontSize:9,color:"#6c757d"}}>CPIC Guidelines 2024 · Clinical Decision Support</div>
-              </div>
-            </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              {["Privacy Policy","Terms of Use","Contact","Documentation"].map(l=>(
-                <button key={l} className="pg-btn pg-btn-ghost" style={{fontSize:11,padding:"5px 12px"}}>{l}</button>
-              ))}
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </div>
   );

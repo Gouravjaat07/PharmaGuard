@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import Navbar from "./Navbar";
+import Footer from "./Footer";
 
 // ─── STYLES ──────────────────────────────────────────────────────────────────
 const injectStyles = () => {
@@ -407,6 +409,7 @@ function BookingConfirmation({ booking, onViewDashboard }) {
         <div className="mono" style={{ fontSize:16, color:"#20C997", fontWeight:700, marginTop:10, letterSpacing:1 }}>#{booking.bookingId}</div>
       </div>
 
+      {/* ── Technician card: "📞 Call" button removed ── */}
       <div style={{ background:"rgba(11,94,215,0.05)", border:"1px solid rgba(11,94,215,0.2)", borderRadius:14, padding:"16px 20px", marginBottom:16, display:"flex", gap:14, alignItems:"center" }}>
         <div className="tech-avatar" style={{ width:50, height:50 }}>{tech.avatar}</div>
         <div style={{ flex:1 }}>
@@ -416,7 +419,6 @@ function BookingConfirmation({ booking, onViewDashboard }) {
             🛵 Arrives by {booking.timeSlot || "8:30 AM"} on {booking.date ? new Date(booking.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"}) : "Tomorrow"}
           </div>
         </div>
-        <button className="pg-btn pg-btn-ghost" style={{ fontSize:11 }}>📞 Call</button>
       </div>
 
       <div className="pg-card" style={{ marginBottom:16 }}>
@@ -463,12 +465,10 @@ function BookingConfirmation({ booking, onViewDashboard }) {
         </div>
       </div>
 
+      {/* ── Bottom actions: "📄 Download Receipt" button removed ── */}
       <div style={{ display:"flex", gap:10 }}>
         <button className="pg-btn pg-btn-lab" style={{ flex:1, justifyContent:"center", fontSize:13 }} onClick={onViewDashboard}>
           📊 View Dashboard
-        </button>
-        <button className="pg-btn pg-btn-ghost" style={{ flex:1, justifyContent:"center", fontSize:13 }}>
-          📄 Download Receipt
         </button>
       </div>
     </div>
@@ -656,6 +656,7 @@ function UserDashboard({ booking }) {
               {(booking.selectedTests?.length || 0) > 3 && <span className="pg-badge" style={{ background:"rgba(11,94,215,0.08)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.15)", fontSize:10 }}>+{(booking.selectedTests?.length || 0) - 3} more</span>}
             </div>
           </div>
+          {/* ── "📞 Call Tech" button removed from here ── */}
           <div style={{ display:"flex", flexDirection:"column", gap:8, alignItems:"flex-end" }}>
             <div style={{ display:"flex", gap:8 }}>
               <div className="tech-avatar" style={{ width:44, height:44, fontSize:18 }}>{tech.avatar}</div>
@@ -669,7 +670,6 @@ function UserDashboard({ booking }) {
               <div style={{ fontSize:10, color:"#6c757d" }}>ETA</div>
               <div style={{ fontSize:16, fontWeight:800, color:"#0B5ED7" }}>{tech.eta}</div>
             </div>
-            <button className="pg-btn pg-btn-ghost" style={{ fontSize:11 }}>📞 Call Tech</button>
           </div>
         </div>
         <div style={{ marginTop:14, paddingTop:14, borderTop:"1px solid rgba(11,94,215,0.06)", display:"flex", gap:8, flexWrap:"wrap" }}>
@@ -787,7 +787,7 @@ function UserDashboard({ booking }) {
               </div>
             ))}
           </div>
-          <button className="pg-btn pg-btn-lab" style={{ marginTop:16, fontSize:12 }}>✏️ Edit Health Profile</button>
+          {/* ── "✏️ Edit Health Profile" button removed ── */}
         </div>
       )}
     </div>
@@ -841,13 +841,13 @@ function HistoryPage() {
                   </div>
                 </div>
               </div>
+              {/* ── "⬇ Receipt" button removed; kept only "📊 View Report" ── */}
               <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
                 <div className="fraunces" style={{ fontSize:20, fontWeight:800, color:"#20C997" }}>₹{h.paid.toLocaleString("en-IN")}</div>
                 <div style={{ display:"flex", gap:7 }}>
                   {h.reportReady && (
                     <button className="pg-btn pg-btn-ghost" style={{ fontSize:11 }}>📊 View Report</button>
                   )}
-                  <button className="pg-btn pg-btn-primary" style={{ fontSize:11 }}>⬇ Receipt</button>
                 </div>
               </div>
             </div>
@@ -945,10 +945,7 @@ function AboutPage() {
 export default function LabTechnicianPage() {
   useEffect(() => { injectStyles(); }, []);
 
-  // page: "booking" | "history" | "about"
   const [page, setPage] = useState("booking");
-
-  // Steps: 0=landing, 1=schedule, 2=details, 3=review/payment, 4=confirmed, 5=dashboard
   const [step, setStep] = useState(0);
   const [selectedTests] = useState(LAB_TESTS.map(t => t.id));
   const [selectedDate, setSelectedDate] = useState(null);
@@ -1038,120 +1035,15 @@ export default function LabTechnicianPage() {
     scrollTop();
   };
 
-  // ─── NAVBAR ────────────────────────────────────────────────────────────────────
   const navigate = useNavigate();
-  const location = useLocation();
-  const [mobileMenu, setMobileMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const NAV_ITEMS = [
-    { label: "Dashboard",        key: "main",       path: "/analysis",       dot: false, internal: false },
-    { label: "👨‍👩‍👧‍👦 Family",    key: "family",     path: "/family-section", dot: true,  internal: false },
-    { label: "Book Technician",  key: "technician", path: "/technician",     dot: false, internal: false },
-    { label: "History",          key: "history",    path: "/history",        dot: false, internal: true  },
-    { label: "About",            key: "about",      path: "/about",          dot: false, internal: true  },
-    { label: "Profile",          key: "profile",    path: "/profile",        dot: false, internal: false },
-  ];
-
-  const isActive = (item) => {
-    if (item.internal) {
-      if (item.key === "history") return page === "history";
-      if (item.key === "about") return page === "about";
-    }
-    if (item.key === "technician") return page === "booking";
-    return location.pathname === item.path;
-  };
-
   const handleNavClick = (item) => {
-    setMobileMenu(false);
-    if (item.internal) {
-      if (item.key === "history") { setPage("history"); scrollTop(); }
-      if (item.key === "about") { setPage("about"); scrollTop(); }
-    } else if (item.key === "technician") {
-      setPage("booking");
-      setStep(0);
-      scrollTop();
-    } else {
-      navigate(item.path);
-    }
+    if (item.key === "history") { setPage("history"); scrollTop(); }
+    else if (item.key === "about")   { setPage("about");   scrollTop(); }
+    else if (item.key === "technician") { setPage("booking"); setStep(0); scrollTop(); }
   };
 
-  const NavBar = () => (
-    <nav style={{
-      position:"sticky", top:0, zIndex:100,
-      background:"rgba(255,255,255,0.95)", backdropFilter:"blur(20px)",
-      borderBottom:"1.5px solid rgba(11,94,215,0.1)",
-      padding:"0 24px", display:"flex", alignItems:"center",
-      justifyContent:"space-between", height:62,
-      boxShadow:"0 2px 12px rgba(11,94,215,0.06)"
-    }}>
-      <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:9, cursor:"pointer" }} onClick={() => navigate("/analysis")}>
-          <div style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,#0B5ED7,#094bb3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, boxShadow:"0 4px 12px rgba(11,94,215,0.25)" }}>🧬</div>
-          <div>
-            <div style={{ fontFamily:"'Syne',sans-serif", fontSize:16, fontWeight:800, color:"#0B5ED7", letterSpacing:0.3 }}>PharmaGuard</div>
-            <div style={{ fontFamily:"'DM Mono',monospace", fontSize:9, color:"#20C997", letterSpacing:3 }}>PRECISION MEDICINE</div>
-          </div>
-        </div>
-
-        <div className="hide-mobile" style={{ display:"flex", gap:2, marginLeft:16 }}>
-          {NAV_ITEMS.map(item => (
-            <button key={item.key}
-              className={`nav-link tab-btn ${isActive(item) ? "active" : ""}`}
-              onClick={() => handleNavClick(item)}
-              style={{ position:"relative", color:isActive(item)?"#0B5ED7":"#495057" }}
-            >
-              {item.label}
-              {item.dot && <span style={{ position:"absolute", top:-6, right:-6, width:8, height:8, borderRadius:"50%", background:"#0B5ED7", boxShadow:"0 0 6px rgba(11,94,215,0.5)" }} />}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-        {page === "booking" && step >= 1 && step < 4 && totalPrice > 0 && (
-          <div className="hide-mobile" style={{ background:"rgba(11,94,215,0.07)", border:"1.5px solid rgba(11,94,215,0.15)", borderRadius:9, padding:"5px 12px", display:"flex", alignItems:"center", gap:6 }}>
-            <span style={{ fontSize:11, color:"#6c757d" }}>Cart:</span>
-            <span className="fraunces" style={{ fontSize:14, fontWeight:800, color:"#0B5ED7" }}>₹{totalPrice.toLocaleString("en-IN")}</span>
-          </div>
-        )}
-        <button onClick={() => setSidebarOpen(true)} style={{
-          display:"flex", alignItems:"center", gap:8,
-          background:"rgba(11,94,215,0.06)", border:"1.5px solid rgba(11,94,215,0.14)",
-          borderRadius:10, padding:"6px 12px", cursor:"pointer", transition:"all 0.18s"
-        }}
-          onMouseEnter={e => { e.currentTarget.style.background="rgba(11,94,215,0.1)"; e.currentTarget.style.borderColor="#0B5ED7"; }}
-          onMouseLeave={e => { e.currentTarget.style.background="rgba(11,94,215,0.06)"; e.currentTarget.style.borderColor="rgba(11,94,215,0.14)"; }}
-        >
-          <div style={{ width:26, height:26, borderRadius:"50%", background:"linear-gradient(135deg,#0B5ED7,#20C997)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800, color:"#fff" }}>DR</div>
-          <span className="hide-mobile" style={{ fontSize:12, fontWeight:600, color:"#212529" }}>Dr. Roberts</span>
-        </button>
-        <button className="hide-desktop pg-btn pg-btn-ghost" style={{ padding:"7px 11px" }} onClick={() => setMobileMenu(!mobileMenu)}>
-          {mobileMenu ? "✕" : "☰"}
-        </button>
-      </div>
-
-      {mobileMenu && (
-        <div style={{ position:"absolute", top:62, left:0, right:0, background:"#fff", borderBottom:"1.5px solid rgba(11,94,215,0.1)", padding:14, display:"flex", flexDirection:"column", gap:6, boxShadow:"0 8px 20px rgba(11,94,215,0.08)", zIndex:200 }}>
-          {NAV_ITEMS.map(item => (
-            <button key={item.key} className={`tab-btn ${isActive(item)?"active":""}`}
-              onClick={() => handleNavClick(item)}
-              style={{ textAlign:"left", padding:"9px 12px" }}>
-              {item.label}
-            </button>
-          ))}
-          {page === "booking" && step >= 1 && step < 4 && totalPrice > 0 && (
-            <div style={{ borderTop:"1px solid rgba(11,94,215,0.08)", paddingTop:10, marginTop:4, display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px 0" }}>
-              <span style={{ fontSize:12, color:"#6c757d" }}>Cart Total:</span>
-              <span className="fraunces" style={{ fontSize:16, fontWeight:800, color:"#0B5ED7" }}>₹{totalPrice.toLocaleString("en-IN")}</span>
-            </div>
-          )}
-        </div>
-      )}
-    </nav>
-  );
-
-  // ─── SIDEBAR ───────────────────────────────────────────────────────────────────
   const LabSidebar = () => {
     if (!sidebarOpen) return null;
     return (
@@ -1204,7 +1096,13 @@ export default function LabTechnicianPage() {
       <div style={{ position:"fixed", bottom:-200, left:-100, width:500, height:500, borderRadius:"50%", background:"radial-gradient(circle,rgba(32,201,151,0.04),transparent 70%)", zIndex:0, pointerEvents:"none" }} />
 
       <div style={{ position:"relative", zIndex:1 }}>
-        <NavBar />
+        <Navbar
+          page={page}
+          step={step}
+          totalPrice={totalPrice}
+          onNavClick={handleNavClick}
+          onSidebarOpen={() => setSidebarOpen(true)}
+        />
         <LabSidebar />
         {showPayment && (
           <PaymentModal
@@ -1217,16 +1115,11 @@ export default function LabTechnicianPage() {
 
         <div ref={topRef} style={{ maxWidth:1180, margin:"0 auto", padding:"30px 22px" }}>
 
-          {/* ── HISTORY PAGE ── */}
           {page === "history" && <HistoryPage />}
-
-          {/* ── ABOUT PAGE ── */}
           {page === "about" && <AboutPage />}
 
-          {/* ── BOOKING PAGES ── */}
           {page === "booking" && (
             <>
-              {/* STEP 0: LANDING */}
               {step === 0 && (
                 <div className="lab-fadeUp">
                   <div style={{ marginBottom:36 }}>
@@ -1268,21 +1161,18 @@ export default function LabTechnicianPage() {
                 </div>
               )}
 
-              {/* STEP 4: CONFIRMED */}
               {step === 4 && (
                 <div className="lab-fadeUp">
                   <BookingConfirmation booking={booking} onViewDashboard={() => { setStep(5); scrollTop(); }} />
                 </div>
               )}
 
-              {/* STEP 5: DASHBOARD */}
               {step === 5 && (
                 <div className="lab-fadeUp">
                   <UserDashboard booking={booking} />
                 </div>
               )}
 
-              {/* BOOKING STEPS 1–3 */}
               {step >= 1 && step <= 3 && (
                 <>
                   <div className="lab-fadeUp" style={{ marginBottom:28 }}>
@@ -1307,7 +1197,6 @@ export default function LabTechnicianPage() {
                   <ProgressSteps current={step} />
 
                   <div>
-                    {/* STEP 1 — Schedule */}
                     {step === 1 && (
                       <div className="lab-fadeUp" style={{ display:"flex", flexDirection:"column", gap:18 }}>
                         <div className="pg-card">
@@ -1331,7 +1220,7 @@ export default function LabTechnicianPage() {
                               <div style={{ fontWeight:700, fontSize:15 }}>Select Time Slot</div>
                               <div style={{ fontSize:11, color:"#6c757d" }}>Slots available 7 AM – 7 PM</div>
                             </div>
-                            {selectedTime && <span className="pg-badge" style={{ marginLeft:"auto", background:urgent?"rgba(239,68,68,0.12)":"rgba(32,201,151,0.1)", color:urgent?"#ef4444":"#20C997", border:`1px solid ${urgent?"rgba(239,68,68,0.3)":"rgba(32,201,151,0.2)"}` }}>{selectedTime}</span>}
+                            {selectedTime && <span className="pg-badge" style={{ marginLeft:"auto", background:urgent?"rgba(239,68,68,0.12)":"rgba(32,201,151,0.1)", color:urgent?"#ef4444":"#20C997", border:`1px solid ${urgent?"rgba(239,68,68,0.3)":"rgba(32,201,151,0.2)"}`}}>{selectedTime}</span>}
                           </div>
                           <TimeSlotPicker selectedTime={selectedTime} onSelect={setSelectedTime} urgent={urgent} />
                         </div>
@@ -1357,7 +1246,6 @@ export default function LabTechnicianPage() {
                       </div>
                     )}
 
-                    {/* STEP 2 — Personal Details */}
                     {step === 2 && (
                       <div className="pg-card lab-fadeUp">
                         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:24 }}>
@@ -1474,7 +1362,6 @@ export default function LabTechnicianPage() {
                       </div>
                     )}
 
-                    {/* STEP 3 — Review & Pay */}
                     {step === 3 && (
                       <div className="lab-fadeUp" style={{ display:"flex", flexDirection:"column", gap:16 }}>
                         <div className="pg-card" style={{ border:"1px solid rgba(11,94,215,0.15)" }}>
@@ -1547,7 +1434,6 @@ export default function LabTechnicianPage() {
                       </div>
                     )}
 
-                    {/* Navigation */}
                     <div style={{ display:"flex", justifyContent:"space-between", marginTop:24 }}>
                       <button className="pg-btn pg-btn-ghost" onClick={handleBack}>← Back</button>
                       {step < 3 && (
@@ -1563,14 +1449,7 @@ export default function LabTechnicianPage() {
           )}
         </div>
 
-        {/* Footer */}
-        <footer style={{ borderTop:"1px solid rgba(11,94,215,0.05)", marginTop:40, padding:"22px 24px" }}>
-          <div style={{ maxWidth:900, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
-            <span>🧬</span>
-            <span className="fraunces" style={{ fontWeight:700, color:"#212529" }}>PharmaGuard v3.0</span>
-            <span style={{ color:"#6c757d", fontSize:12 }}>· Home Lab · NABL Accredited · HIPAA Compliant</span>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </div>
   );

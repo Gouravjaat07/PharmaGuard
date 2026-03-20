@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import Navbar from "./Navbar";
+import Footer from "./Footer";
 
 
 // ─── REAL VCF PARSER ────────────────────────────────────────────────────────────
@@ -146,16 +148,6 @@ const RELATION_ICONS = {
 
 const BLOOD_GROUPS = ["A+","A-","B+","B-","AB+","AB-","O+","O-","Unknown"];
 const RELATIONS = ["Self","Father","Mother","Son","Daughter","Brother","Sister","Grandfather","Grandmother","Uncle","Aunt","Cousin","Spouse","Other"];
-
-// ─── SHARED NAV ITEMS ─────────────────────────────────────────────────────────
-const NAV_ITEMS = [
-  { label: "Dashboard", path: "/analysis" },
-  { label: "👨‍👩‍👧‍👦 Family", path: "/family-section" },
-  { label: "Book Technician", path: "/technician" },
-  { label: "History", path: "/history" },
-  { label: "About", path: "/about" },
-  { label: "Profile", path: "/profile" },
-];
 
 // ─── STYLES ─────────────────────────────────────────────────────────────────────
 const injectStyles = () => {
@@ -326,63 +318,6 @@ const runAnalysis = async (fileInfo, drugs) => {
     vcfQuality: { variantConfidence:94.1, annotationCoverage:91.7, pgxVariants:fileInfo.pgxGenes?.length||0 },
   };
 };
-
-// ─── SHARED NAVBAR ────────────────────────────────────────────────────────────
-function SharedNavbar({ currentPath, navigate, onOpenSidebar }) {
-  const [mobileMenu, setMobileMenu] = useState(false);
-
-  return (
-    <nav style={{
-      position: "sticky", top: 0, zIndex: 100,
-      background: "rgba(255,255,255,0.95)", backdropFilter: "blur(20px)",
-      borderBottom: "1.5px solid rgba(11,94,215,0.1)",
-      padding: "0 24px", display: "flex", alignItems: "center",
-      justifyContent: "space-between", height: 62,
-    }}>
-      <div style={{ display:"flex", alignItems:"center", gap:12, cursor:"pointer" }} onClick={() => navigate("/analysis")}>
-        <div style={{ width:34, height:34, borderRadius:8, background:"linear-gradient(135deg,#0B5ED7,#094bb3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, color:"#fff" }}>🧬</div>
-        <span style={{ fontWeight:800, color:"#0B5ED7", fontFamily:"Syne,sans-serif" }}>PharmaGuard</span>
-      </div>
-
-      <div className="hide-mobile" style={{ display:"flex", gap:4 }}>
-        {NAV_ITEMS.map(item => (
-          <button key={item.path}
-            className={`tab-btn nav-link ${currentPath === item.path ? "active" : ""}`}
-            onClick={() => navigate(item.path)}>
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-        <button
-          onClick={onOpenSidebar}
-          style={{
-            width:36, height:36, borderRadius:"50%",
-            background:"linear-gradient(135deg,#0B5ED7,#20C997)",
-            border:"none", cursor:"pointer", display:"flex",
-            alignItems:"center", justifyContent:"center",
-            fontSize:14, color:"#fff", fontWeight:800,
-            boxShadow:"0 2px 8px rgba(11,94,215,0.25)", transition:"all 0.2s",
-          }}
-          title="Open profile"
-        >DR</button>
-        <button className="pg-btn pg-btn-ghost hide-desktop" onClick={() => setMobileMenu(!mobileMenu)}>☰</button>
-      </div>
-
-      {mobileMenu && (
-        <div style={{ position:"absolute", top:62, left:0, right:0, background:"#fff", padding:14, display:"flex", flexDirection:"column", gap:6, borderBottom:"1.5px solid rgba(11,94,215,0.1)", zIndex:50 }}>
-          {NAV_ITEMS.map(item => (
-            <button key={item.path} className="tab-btn" style={{ textAlign:"left" }}
-              onClick={() => { navigate(item.path); setMobileMenu(false); }}>
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </nav>
-  );
-}
 
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 function Sidebar({ sidebarOpen, setSidebarOpen, navigate }) {
@@ -1805,17 +1740,6 @@ export default function FamilySection() {
     }
   };
 
-  // Current "path" for the navbar active-tab highlight
-  const currentPath = (() => {
-    if (activePage === "analysis")   return "/analysis";
-    if (activePage === "family")     return "/family-section";
-    if (activePage === "history")    return "/history";
-    if (activePage === "about")      return "/about";
-    if (activePage === "profile")    return "/profile";
-    if (activePage === "technician") return "/technician";
-    return "/family-section";
-  })();
-
   return (
     <div style={{ minHeight:"100vh", background:"#F8F9FA", color:"#212529", fontFamily:"'Epilogue',sans-serif" }}>
       {/* Background */}
@@ -1824,10 +1748,12 @@ export default function FamilySection() {
       <div style={{ position:"fixed", bottom:"-10%", right:"-5%", width:400, height:400, borderRadius:"50%", background:"radial-gradient(circle,rgba(32,201,151,0.06),transparent 68%)", zIndex:0, pointerEvents:"none" }} />
 
       <div style={{ position:"relative", zIndex:1 }}>
-        <SharedNavbar
-          currentPath={currentPath}
-          navigate={handleNavigate}
-          onOpenSidebar={() => setSidebarOpen(true)}
+        <Navbar
+          page={activePage}
+          step={0}
+          totalPrice={0}
+          onNavClick={(item) => handleNavigate(item.path)}
+          onSidebarOpen={() => setSidebarOpen(true)}
         />
 
         {renderPage()}
@@ -1838,23 +1764,7 @@ export default function FamilySection() {
           navigate={handleNavigate}
         />
 
-        {/* Footer */}
-        <footer style={{ borderTop:"1.5px solid rgba(11,94,215,0.1)", marginTop:40, padding:"28px 24px", background:"#fff" }}>
-          <div style={{ maxWidth:900, margin:"0 auto" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8, justifyContent:"center", marginBottom:14 }}>
-              <span>🧬</span>
-              <span className="syne" style={{ fontWeight:700, color:"#0B5ED7" }}>PharmaGuard v3.0</span>
-              <span style={{ color:"#bec8d2", fontSize:12 }}>· CPIC Guidelines 2024 ·</span>
-              <span style={{ color:"#20C997", fontSize:12 }}>Clinical Decision Support</span>
-            </div>
-            <div style={{ background:"rgba(245,158,11,0.06)", border:"1.5px solid rgba(245,158,11,0.2)", borderRadius:10, padding:"14px 18px" }}>
-              <div style={{ fontSize:12, color:"#f59e0b", fontWeight:700, marginBottom:5 }}>⚕️ Medical Use Limitation Notice</div>
-              <div style={{ fontSize:11, color:"#495057", lineHeight:1.8 }}>
-                This tool is intended for clinical decision support and research use only. All pharmacogenomic findings must be interpreted by a qualified healthcare professional. <strong style={{ color:"#212529" }}>Prescribing decisions must always be made by a licensed clinician.</strong>
-              </div>
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </div>
   );
