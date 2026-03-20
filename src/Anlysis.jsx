@@ -736,24 +736,15 @@ export default function PharmaGuard() {
       if (!f.name.endsWith(".vcf") && !f.name.endsWith(".vcf.gz")) {
         throw new Error("Invalid format: must be a .vcf file");
       }
+      if (f.size > 5 * 1024 * 1024) {
+        throw new Error("File too large: maximum 5MB allowed");
+      }
 
-      const formData = new FormData();
-      formData.append("file", f);
-
-      const res = await fetch(`${API_BASE}/api/vcf/upload`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.message || "Upload failed");
-
-      setFileInfo(data);
+      const info = await parseVCF(f);   // ← use the local parser, not the API
+      setFileInfo(info);
       setFileStatus("valid");
-
       showNotif(
-        `✓ VCF validated — ${data.variants} variants, ${data.pgxGenes?.length || 0} PGx genes detected`,
+        `✓ VCF validated — ${info.variants} variants, ${info.pgxGenes.length} PGx genes detected`,
         "success"
       );
     } catch (e) {
