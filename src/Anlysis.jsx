@@ -1,30 +1,30 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 
-// ─── REAL VCF PARSER ────────────────────────────────────────────────────────────
+// ─── REAL VCF PARSER (fully local — no backend) ──────────────────────────────
 const parseVCF = async (file) => {
   const text = await file.text();
   const lines = text.split("\n");
   const variants = [];
   const pgxRsids = new Set([
     "rs16947","rs1135840","rs1799853","rs9923231","rs4244285","rs4986893",
-    "rs4149056","rs1800460","rs1142345","rs3918290","rs1057910","rs1799853",
-    "rs2108622","rs1045642","rs4986893","rs28371725","rs56337013","rs72558187",
+    "rs4149056","rs1800460","rs1142345","rs3918290","rs1057910",
+    "rs2108622","rs1045642","rs28371725","rs56337013","rs72558187",
     "rs72558186","rs67376798","rs1801265","rs1801159","rs1801158","rs55886062",
-    "rs2297595","rs1800460","rs1142345","rs1800462","rs2279343","rs4148523",
-    "rs4149015","rs7759561","rs2306283","rs11045819","rs4149032","rs10841753",
-    "rs4149056","rs2306283","rs1045642","rs1128503","rs2032582","rs1045642"
+    "rs2297595","rs1800462","rs2279343","rs4148523","rs4149015","rs7759561",
+    "rs2306283","rs11045819","rs4149032","rs10841753","rs1128503","rs2032582",
   ]);
   const pgxGenes = new Set();
   const geneMap = {
-    "CYP2D6": ["rs16947","rs1135840","rs28371725","rs56337013","rs72558187","rs72558186"],
+    "CYP2D6":  ["rs16947","rs1135840","rs28371725","rs56337013","rs72558187","rs72558186"],
     "CYP2C19": ["rs4244285","rs4986893","rs28399504","rs41291556"],
-    "CYP2C9": ["rs1799853","rs1057910"],
-    "VKORC1": ["rs9923231","rs7294"],
-    "TPMT": ["rs1800460","rs1142345","rs1800462"],
-    "DPYD": ["rs3918290","rs1801265","rs67376798","rs55886062"],
+    "CYP2C9":  ["rs1799853","rs1057910"],
+    "VKORC1":  ["rs9923231","rs7294"],
+    "TPMT":    ["rs1800460","rs1142345","rs1800462"],
+    "DPYD":    ["rs3918290","rs1801265","rs67376798","rs55886062"],
     "SLCO1B1": ["rs4149056","rs2306283","rs4148523"],
-    "ABCB1": ["rs1045642","rs2032582","rs1128503"],
-    "UGT1A1": ["rs887829","rs4148323"],
+    "ABCB1":   ["rs1045642","rs2032582","rs1128503"],
+    "UGT1A1":  ["rs887829","rs4148323"],
   };
   let headerParsed = false;
   let samples = [];
@@ -32,8 +32,8 @@ const parseVCF = async (file) => {
 
   for (const line of lines) {
     if (line.startsWith("##fileformat=")) metadata.fileformat = line.split("=")[1]?.trim();
-    if (line.startsWith("##reference=")) metadata.reference = line.split("=")[1]?.trim();
-    if (line.startsWith("##source=")) metadata.source = line.split("=")[1]?.trim();
+    if (line.startsWith("##reference="))  metadata.reference  = line.split("=")[1]?.trim();
+    if (line.startsWith("##source="))     metadata.source     = line.split("=")[1]?.trim();
     if (line.startsWith("#CHROM")) {
       const cols = line.split("\t");
       samples = cols.slice(9);
@@ -44,8 +44,7 @@ const parseVCF = async (file) => {
     const cols = line.split("\t");
     if (cols.length < 8) continue;
     const [chrom, pos, id, ref, alt, qual, filter, info] = cols;
-    const variant = { chrom, pos, id, ref, alt, qual, filter, info };
-    variants.push(variant);
+    variants.push({ chrom, pos, id, ref, alt, qual, filter, info });
     if (id && id !== ".") {
       const rsid = id.split(";")[0];
       if (pgxRsids.has(rsid)) {
@@ -57,329 +56,319 @@ const parseVCF = async (file) => {
   }
 
   const qualValues = variants.map(v => parseFloat(v.qual)).filter(q => !isNaN(q));
-  const avgQual = qualValues.length > 0 ? qualValues.reduce((a,b)=>a+b,0)/qualValues.length : null;
+  const avgQual    = qualValues.length > 0 ? qualValues.reduce((a,b)=>a+b,0)/qualValues.length : null;
   const qualPercent = avgQual !== null ? Math.min(99.9, Math.max(70, (avgQual/100)*99.9)) : null;
-
-  const sampleId = samples[0] || file.name.replace(".vcf","").replace(".gz","").toUpperCase().slice(0,16) || ("SAMPLE_" + Math.random().toString(36).slice(2,8).toUpperCase());
+  const sampleId   = samples[0] ||
+    file.name.replace(".vcf","").replace(".gz","").toUpperCase().slice(0,16) ||
+    ("SAMPLE_" + Math.random().toString(36).slice(2,8).toUpperCase());
 
   return {
     valid: true,
     variants: variants.length,
-    pgxGenes: pgxGenes.size > 0 ? [...pgxGenes] : ["CYP2D6","CYP2C19","TPMT","DPYD","CYP2C9","VKORC1"].slice(0, Math.max(1, Math.floor(variants.length / 150))),
-    sampleId: sampleId,
-    quality: qualPercent !== null ? parseFloat(qualPercent.toFixed(1)) : parseFloat((92 + Math.random()*7).toFixed(1)),
+    pgxGenes: pgxGenes.size > 0
+      ? [...pgxGenes]
+      : ["CYP2D6","CYP2C19","TPMT","DPYD","CYP2C9","VKORC1"].slice(0, Math.max(1, Math.floor(variants.length/150))),
+    sampleId,
+    quality: qualPercent !== null
+      ? parseFloat(qualPercent.toFixed(1))
+      : parseFloat((92 + Math.random()*7).toFixed(1)),
     metadata,
     samples,
     rawVariants: variants.slice(0,5),
     headerParsed,
-    fileformat: metadata.fileformat || "VCFv4.1"
+    fileformat: metadata.fileformat || "VCFv4.1",
   };
 };
 
 // ─── DRUG DATABASE ────────────────────────────────────────────────────────────
-const ALL_DRUGS = [
+const ALL_DRUGS = Object.freeze(Array.from(new Set([
   "ABACAVIR","AMITRIPTYLINE","ATAZANAVIR","ATOMOXETINE","AZATHIOPRINE",
-  "CARBAMAZEPINE","CITALOPRAM","CLOMIPRAMINE","CLOPIDOGREL","CODEINE",
-  "DESIPRAMINE","DOXEPIN","EFAVIRENZ","ESCITALOPRAM","FLUVOXAMINE",
-  "FLUOROURACIL","IMIPRAMINE","IRINOTECAN","MERCAPTOPURINE","METOPROLOL",
-  "NORTRIPTYLINE","OLANZAPINE","ONDANSETRON","OXCARBAZEPINE","OXYCODONE",
-  "PAROXETINE","PHENYTOIN","RISPERIDONE","SERTRALINE","SIMVASTATIN",
-  "TAMOXIFEN","THIOGUANINE","TRAMADOL","TRIMIPRAMINE","VENLAFAXINE",
-  "VORICONAZOLE","WARFARIN","LOVASTATIN","PRAVASTATIN","ATORVASTATIN",
-  "FLUVASTATIN","CELECOXIB","DICLOFENAC","IBUPROFEN","PIROXICAM",
-  "ALLOPURINOL","RASBURICASE","DAPSONE","PRIMAQUINE","CHLOROQUINE",
-  "TACROLIMUS","SIROLIMUS","CYCLOSPORINE","MYCOPHENOLATE","AZATHIOPRINE",
-  "CAPECITABINE","TEGAFUR","MERCAPTOPURINE","THIOGUANINE","GEFITINIB",
-  "ERLOTINIB","LAPATINIB","IMATINIB","METFORMIN","GLIPIZIDE","GLIMEPIRIDE"
-];
+  "CARBAMAZEPINE","CAPECITABINE","CELECOXIB","CHLOROQUINE",
+  "CITALOPRAM","CLOMIPRAMINE","CLOPIDOGREL","CODEINE",
+  "CYCLOSPORINE","DAPSONE","DESIPRAMINE","DICLOFENAC","DOXEPIN",
+  "EFAVIRENZ","ERLOTINIB","ESCITALOPRAM","FLUOROURACIL",
+  "FLUVOXAMINE","FLUVASTATIN","GEFITINIB","GLIMEPIRIDE",
+  "GLIPIZIDE","IBUPROFEN","IMATINIB","IMIPRAMINE",
+  "IRINOTECAN","LAPATINIB","LOVASTATIN","MERCAPTOPURINE",
+  "METFORMIN","METOPROLOL","MYCOPHENOLATE","NORTRIPTYLINE",
+  "OLANZAPINE","ONDANSETRON","OXCARBAZEPINE","OXYCODONE",
+  "PAROXETINE","PHENYTOIN","PIROXICAM","PRAVASTATIN",
+  "PRIMAQUINE","RASBURICASE","RISPERIDONE","SERTRALINE",
+  "SIROLIMUS","SIMVASTATIN","TACROLIMUS","TAMOXIFEN",
+  "TEGAFUR","THIOGUANINE","TRAMADOL","TRIMIPRAMINE",
+  "VENLAFAXINE","VORICONAZOLE","WARFARIN","LOVASTATIN",
+  "ATORVASTATIN","ALLOPURINOL",
+])).sort());
 
 const DRUG_DATABASE = {
   CODEINE: {
-    gene: "CYP2D6", diplotype: "*1/*2", phenotype: "URM",
-    phenotypeLabel: "Ultrarapid Metabolizer",
-    risk: "Toxic", severity: "critical", confidence: 0.91,
-    mechanism: "CYP2D6 ultrarapid metabolism converts codeine to morphine at an accelerated rate, leading to dangerously elevated morphine plasma levels. This causes severe opioid effects including respiratory depression, sedation, and potentially fatal overdose even at standard doses.",
-    whyRisk: "Your genetic profile shows duplicated CYP2D6 gene copies, causing ultrarapid conversion of codeine to its active morphine metabolite. Standard doses become toxic because your body processes codeine ~3-5x faster than average metabolizers.",
-    cpic: "CPIC Level A", dosage: "Avoid codeine entirely — use non-CYP2D6-dependent opioid", alternative: "Morphine (titrated carefully) or Hydromorphone",
-    variants: [{ rsid: "rs16947", allele: "C>T", impact: "HIGH", gene: "CYP2D6", consequence: "Increased activity" }, { rsid: "rs1135840", allele: "G>C", impact: "MODERATE", gene: "CYP2D6", consequence: "Altered splicing" }],
-    geneImpact: 94, references: ["PMID:23222671","CPIC Guideline 2014"], category: "Opioid Analgesic"
+    gene:"CYP2D6", diplotype:"*1/*2", phenotype:"URM", phenotypeLabel:"Ultrarapid Metabolizer",
+    risk:"Toxic", severity:"critical", confidence:0.91,
+    mechanism:"CYP2D6 ultrarapid metabolism converts codeine to morphine at an accelerated rate, leading to dangerously elevated morphine plasma levels causing respiratory depression and potentially fatal overdose.",
+    whyRisk:"Your genetic profile shows duplicated CYP2D6 gene copies, causing ultrarapid conversion of codeine to morphine. Standard doses become toxic ~3-5x faster than average metabolizers.",
+    cpic:"CPIC Level A", dosage:"Avoid codeine — use non-CYP2D6-dependent opioid", alternative:"Morphine (titrated) or Hydromorphone",
+    variants:[{rsid:"rs16947",allele:"C>T",impact:"HIGH",gene:"CYP2D6",consequence:"Increased activity"},{rsid:"rs1135840",allele:"G>C",impact:"MODERATE",gene:"CYP2D6",consequence:"Altered splicing"}],
+    geneImpact:94, references:["PMID:23222671","CPIC Guideline 2014"], category:"Opioid Analgesic",
   },
   WARFARIN: {
-    gene: "CYP2C9 + VKORC1", diplotype: "*1/*3", phenotype: "IM",
-    phenotypeLabel: "Intermediate Metabolizer",
-    risk: "Adjust Dosage", severity: "high", confidence: 0.88,
-    mechanism: "Reduced CYP2C9 activity decreases warfarin S-enantiomer clearance, increasing anticoagulant effect. The VKORC1 variant reduces enzyme levels, increasing sensitivity to warfarin's mechanism of action.",
-    whyRisk: "Your CYP2C9*3 allele reduces warfarin metabolism by ~90% compared to wildtype. Combined with your VKORC1 variant, your stable warfarin dose is predicted to be 2-3mg/day versus the typical 5mg/day population average.",
-    cpic: "CPIC Level A", dosage: "Reduce initial dose by 25–50%; frequent INR monitoring required in first 4 weeks", alternative: "Apixaban or Rivaroxaban (no dose adjustment needed)",
-    variants: [{ rsid: "rs1799853", allele: "C>T", impact: "HIGH", gene: "CYP2C9", consequence: "p.Arg144Cys — reduced activity" }, { rsid: "rs9923231", allele: "C>T", impact: "HIGH", gene: "VKORC1", consequence: "Promoter variant — reduced expression" }],
-    geneImpact: 78, references: ["PMID:21900891","IWPC 2009"], category: "Anticoagulant"
+    gene:"CYP2C9 + VKORC1", diplotype:"*1/*3", phenotype:"IM", phenotypeLabel:"Intermediate Metabolizer",
+    risk:"Adjust Dosage", severity:"high", confidence:0.88,
+    mechanism:"Reduced CYP2C9 activity decreases warfarin S-enantiomer clearance. VKORC1 variant reduces enzyme levels, increasing anticoagulant sensitivity.",
+    whyRisk:"CYP2C9*3 reduces warfarin metabolism by ~90%. Combined with VKORC1 variant, stable dose predicted 2-3mg/day vs typical 5mg/day.",
+    cpic:"CPIC Level A", dosage:"Reduce initial dose 25–50%; frequent INR monitoring first 4 weeks", alternative:"Apixaban or Rivaroxaban",
+    variants:[{rsid:"rs1799853",allele:"C>T",impact:"HIGH",gene:"CYP2C9",consequence:"p.Arg144Cys — reduced activity"},{rsid:"rs9923231",allele:"C>T",impact:"HIGH",gene:"VKORC1",consequence:"Promoter variant — reduced expression"}],
+    geneImpact:78, references:["PMID:21900891","IWPC 2009"], category:"Anticoagulant",
   },
   CLOPIDOGREL: {
-    gene: "CYP2C19", diplotype: "*2/*2", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Ineffective", severity: "high", confidence: 0.96,
-    mechanism: "CYP2C19 loss-of-function variants prevent bioactivation of clopidogrel prodrug. Without active metabolite formation, platelet P2Y12 receptors remain uninhibited, leaving patients vulnerable to thrombotic events including stent thrombosis and MI.",
-    whyRisk: "Your *2/*2 diplotype means you carry two non-functional CYP2C19 copies. This completely abolishes the conversion of clopidogrel to its active thienopyridine metabolite — you receive essentially no antiplatelet benefit from this drug.",
-    cpic: "CPIC Level A", dosage: "Avoid clopidogrel — use alternative antiplatelet agent", alternative: "Ticagrelor 90mg BID or Prasugrel 10mg QD (if no contraindication)",
-    variants: [{ rsid: "rs4244285", allele: "G>A", impact: "HIGH", gene: "CYP2C19", consequence: "p.Pro227Leu — loss of function *2 allele" }, { rsid: "rs4986893", allele: "G>A", impact: "HIGH", gene: "CYP2C19", consequence: "p.Trp212Ter — premature stop codon *3 allele" }],
-    geneImpact: 96, references: ["PMID:21716271","TRITON-TIMI 38"], category: "Antiplatelet"
+    gene:"CYP2C19", diplotype:"*2/*2", phenotype:"PM", phenotypeLabel:"Poor Metabolizer",
+    risk:"Ineffective", severity:"high", confidence:0.96,
+    mechanism:"CYP2C19 loss-of-function prevents bioactivation of clopidogrel prodrug, leaving P2Y12 receptors uninhibited.",
+    whyRisk:"*2/*2 diplotype completely abolishes conversion to active metabolite — no antiplatelet benefit.",
+    cpic:"CPIC Level A", dosage:"Avoid clopidogrel", alternative:"Ticagrelor 90mg BID or Prasugrel 10mg QD",
+    variants:[{rsid:"rs4244285",allele:"G>A",impact:"HIGH",gene:"CYP2C19",consequence:"Loss of function *2 allele"},{rsid:"rs4986893",allele:"G>A",impact:"HIGH",gene:"CYP2C19",consequence:"Premature stop *3 allele"}],
+    geneImpact:96, references:["PMID:21716271"], category:"Antiplatelet",
   },
   SIMVASTATIN: {
-    gene: "SLCO1B1", diplotype: "*5/*5", phenotype: "PM",
-    phenotypeLabel: "Poor Transporter Function",
-    risk: "Toxic", severity: "high", confidence: 0.83,
-    mechanism: "SLCO1B1 deficiency impairs hepatic uptake transporter OATP1B1, causing simvastatin and its active acid form to accumulate in systemic circulation rather than being cleared by the liver. Elevated plasma concentrations dramatically increase myopathy and rhabdomyolysis risk.",
-    whyRisk: "Your SLCO1B1*5 homozygous genotype reduces hepatic simvastatin uptake by ~70%. At standard 40mg doses, you face a 15-fold increased risk of myopathy. The risk scales steeply with dose — 80mg simvastatin is essentially contraindicated.",
-    cpic: "CPIC Level A", dosage: "Maximum 20mg/day simvastatin if continued; strongly consider statin switch", alternative: "Rosuvastatin or Pravastatin (not SLCO1B1-dependent)",
-    variants: [{ rsid: "rs4149056", allele: "T>C", impact: "HIGH", gene: "SLCO1B1", consequence: "p.Val174Ala — reduced OATP1B1 function" }],
-    geneImpact: 85, references: ["PMID:20019282","SEARCH Collaboration 2008"], category: "Statin"
+    gene:"SLCO1B1", diplotype:"*5/*5", phenotype:"PM", phenotypeLabel:"Poor Transporter Function",
+    risk:"Toxic", severity:"high", confidence:0.83,
+    mechanism:"SLCO1B1 deficiency impairs hepatic OATP1B1 uptake, causing simvastatin accumulation and dramatically increased myopathy risk.",
+    whyRisk:"*5/*5 reduces hepatic uptake ~70%. 15-fold increased myopathy risk at standard 40mg doses.",
+    cpic:"CPIC Level A", dosage:"Max 20mg/day; consider statin switch", alternative:"Rosuvastatin or Pravastatin",
+    variants:[{rsid:"rs4149056",allele:"T>C",impact:"HIGH",gene:"SLCO1B1",consequence:"p.Val174Ala — reduced OATP1B1 function"}],
+    geneImpact:85, references:["PMID:20019282"], category:"Statin",
   },
   AZATHIOPRINE: {
-    gene: "TPMT", diplotype: "*3A/*3A", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Toxic", severity: "critical", confidence: 0.99,
-    mechanism: "TPMT enzyme deficiency causes shunting of 6-MP metabolism toward cytotoxic thioguanine nucleotides (TGN). Accumulation of TGNs causes severe, potentially life-threatening myelosuppression including profound neutropenia, anemia, and thrombocytopenia.",
-    whyRisk: "TPMT *3A/*3A is the most severe loss-of-function genotype — you have essentially zero TPMT enzyme activity. Standard azathioprine doses would produce TGN levels 10-40x above the toxic threshold, causing severe bone marrow suppression within weeks.",
-    cpic: "CPIC Level A", dosage: "Reduce dose by 90% (e.g., 10% of standard) OR use alternative immunosuppressant", alternative: "Mycophenolate mofetil or Cyclosporine (non-TPMT dependent)",
-    variants: [{ rsid: "rs1800460", allele: "C>T", impact: "HIGH", gene: "TPMT", consequence: "p.Ala154Thr — *3A haplotype component" }, { rsid: "rs1142345", allele: "T>C", impact: "HIGH", gene: "TPMT", consequence: "p.Tyr240Cys — *3A haplotype component" }],
-    geneImpact: 99, references: ["PMID:21270794","CPIC Thiopurine 2018"], category: "Immunosuppressant"
+    gene:"TPMT", diplotype:"*3A/*3A", phenotype:"PM", phenotypeLabel:"Poor Metabolizer",
+    risk:"Toxic", severity:"critical", confidence:0.99,
+    mechanism:"TPMT deficiency causes toxic thioguanine nucleotide accumulation, causing life-threatening myelosuppression.",
+    whyRisk:"*3A/*3A = zero TPMT activity. Standard doses produce TGN 10-40x above toxic threshold.",
+    cpic:"CPIC Level A", dosage:"Reduce dose 90% or use alternative", alternative:"Mycophenolate or Cyclosporine",
+    variants:[{rsid:"rs1800460",allele:"C>T",impact:"HIGH",gene:"TPMT",consequence:"p.Ala154Thr"},{rsid:"rs1142345",allele:"T>C",impact:"HIGH",gene:"TPMT",consequence:"p.Tyr240Cys"}],
+    geneImpact:99, references:["CPIC Thiopurine 2018"], category:"Immunosuppressant",
   },
   FLUOROURACIL: {
-    gene: "DPYD", diplotype: "*2A/*1", phenotype: "IM",
-    phenotypeLabel: "Intermediate Metabolizer",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.77,
-    mechanism: "Partial DPYD deficiency reduces catabolism of fluorouracil (5-FU), increasing drug exposure (AUC) and causing disproportionate toxicity including severe mucositis, neutropenia, and neurotoxicity.",
-    whyRisk: "Your DPYD *2A heterozygous status reduces fluoropyrimidine clearance by approximately 50%. At standard doses, you would experience significantly higher 5-FU plasma concentrations, increasing risk of grade 3-4 toxicities to ~30-40% vs ~10% in normal metabolizers.",
-    cpic: "CPIC Level A", dosage: "Reduce starting dose by 50%; increase based on toxicity and pharmacokinetic monitoring", alternative: "Capecitabine at reduced dose (same DPYD consideration applies)",
-    variants: [{ rsid: "rs3918290", allele: "C>T", impact: "HIGH", gene: "DPYD", consequence: "IVS14+1G>A — splice site disruption, exon 14 skipping" }],
-    geneImpact: 72, references: ["PMID:23988873","DPWG 2020"], category: "Chemotherapy"
+    gene:"DPYD", diplotype:"*2A/*1", phenotype:"IM", phenotypeLabel:"Intermediate Metabolizer",
+    risk:"Adjust Dosage", severity:"moderate", confidence:0.77,
+    mechanism:"Partial DPYD deficiency reduces 5-FU catabolism, increasing AUC and causing severe mucositis and neutropenia.",
+    whyRisk:"*2A heterozygous reduces clearance ~50%. Grade 3-4 toxicity risk rises to ~30-40%.",
+    cpic:"CPIC Level A", dosage:"Reduce starting dose 50%; escalate based on monitoring", alternative:"Capecitabine at reduced dose",
+    variants:[{rsid:"rs3918290",allele:"C>T",impact:"HIGH",gene:"DPYD",consequence:"IVS14+1G>A — splice site disruption"}],
+    geneImpact:72, references:["DPWG 2020"], category:"Chemotherapy",
   },
   CITALOPRAM: {
-    gene: "CYP2C19", diplotype: "*2/*2", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.82,
-    mechanism: "CYP2C19 poor metabolizers show dramatically increased citalopram plasma levels (2-3x), raising risk of QTc prolongation and dose-dependent adverse effects.",
-    whyRisk: "Your CYP2C19 *2/*2 genotype eliminates citalopram metabolism. At standard 20-40mg doses, plasma levels equivalent to 60-80mg in a normal metabolizer are expected, exceeding FDA maximum dose safety thresholds for QTc risk.",
-    cpic: "CPIC Level A", dosage: "Maximum 20mg/day; consider ECG monitoring", alternative: "Sertraline (less CYP2C19 dependent) or Mirtazapine",
-    variants: [{ rsid: "rs4244285", allele: "G>A", impact: "HIGH", gene: "CYP2C19", consequence: "Loss-of-function *2 allele" }],
-    geneImpact: 78, references: ["CPIC CYP2C19 Antidepressant 2015"], category: "Antidepressant (SSRI)"
+    gene:"CYP2C19", diplotype:"*2/*2", phenotype:"PM", phenotypeLabel:"Poor Metabolizer",
+    risk:"Adjust Dosage", severity:"moderate", confidence:0.82,
+    mechanism:"CYP2C19 PM shows 2-3x higher citalopram levels, raising QTc prolongation risk.",
+    whyRisk:"*2/*2 eliminates citalopram metabolism; standard 20-40mg produces levels equivalent to 60-80mg.",
+    cpic:"CPIC Level A", dosage:"Max 20mg/day; ECG monitoring", alternative:"Sertraline or Mirtazapine",
+    variants:[{rsid:"rs4244285",allele:"G>A",impact:"HIGH",gene:"CYP2C19",consequence:"Loss-of-function *2 allele"}],
+    geneImpact:78, references:["CPIC Antidepressant 2015"], category:"Antidepressant (SSRI)",
   },
   AMITRIPTYLINE: {
-    gene: "CYP2D6 + CYP2C19", diplotype: "*4/*4", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Toxic", severity: "high", confidence: 0.88,
-    mechanism: "CYP2D6 and CYP2C19 deficiency markedly reduces TCA metabolism, leading to accumulation of amitriptyline and nortriptyline with cardiotoxic and CNS effects.",
-    whyRisk: "Dual CYP2D6/CYP2C19 poor metabolizer status causes 5-10x higher TCA concentrations. Risk of QRS prolongation, arrhythmia, and serotonin toxicity is substantially elevated at standard doses.",
-    cpic: "CPIC Level A", dosage: "Avoid if possible; if used, reduce dose by 50% with plasma level monitoring", alternative: "Escitalopram or Mirtazapine",
-    variants: [{ rsid: "rs3892097", allele: "G>A", impact: "HIGH", gene: "CYP2D6", consequence: "*4 null allele — splicing defect" }],
-    geneImpact: 88, references: ["CPIC TCA 2016"], category: "Antidepressant (TCA)"
+    gene:"CYP2D6 + CYP2C19", diplotype:"*4/*4", phenotype:"PM", phenotypeLabel:"Poor Metabolizer",
+    risk:"Toxic", severity:"high", confidence:0.88,
+    mechanism:"Dual CYP2D6/CYP2C19 deficiency markedly reduces TCA metabolism, causing accumulation with cardiotoxic and CNS effects.",
+    whyRisk:"Dual PM status causes 5-10x higher TCA concentrations. QRS prolongation and arrhythmia risk substantially elevated.",
+    cpic:"CPIC Level A", dosage:"Avoid if possible; reduce dose 50% with plasma monitoring", alternative:"Escitalopram or Mirtazapine",
+    variants:[{rsid:"rs3892097",allele:"G>A",impact:"HIGH",gene:"CYP2D6",consequence:"*4 null allele — splicing defect"}],
+    geneImpact:88, references:["CPIC TCA 2016"], category:"Antidepressant (TCA)",
   },
   METOPROLOL: {
-    gene: "CYP2D6", diplotype: "*4/*4", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.79,
-    mechanism: "CYP2D6 poor metabolizers accumulate metoprolol at 5-fold higher plasma concentrations, causing excessive beta-blockade including bradycardia, hypotension, and bronchoconstriction.",
-    whyRisk: "Standard metoprolol doses in CYP2D6 poor metabolizers produce plasma levels equivalent to 5x overdose in normal metabolizers. Bradycardia risk is substantially increased, especially in elderly patients.",
-    cpic: "CPIC Level B", dosage: "Reduce dose by 50-75%; titrate based on heart rate and blood pressure", alternative: "Bisoprolol or Carvedilol (less CYP2D6 dependent)",
-    variants: [{ rsid: "rs3892097", allele: "G>A", impact: "HIGH", gene: "CYP2D6", consequence: "Null allele — no enzyme production" }],
-    geneImpact: 71, references: ["DPWG Metoprolol 2019"], category: "Beta Blocker"
+    gene:"CYP2D6", diplotype:"*4/*4", phenotype:"PM", phenotypeLabel:"Poor Metabolizer",
+    risk:"Adjust Dosage", severity:"moderate", confidence:0.79,
+    mechanism:"CYP2D6 PM accumulates metoprolol at 5-fold higher levels, causing excessive beta-blockade.",
+    whyRisk:"Standard doses equivalent to 5x in normal metabolizers. Bradycardia risk substantially increased.",
+    cpic:"CPIC Level B", dosage:"Reduce dose 50-75%; titrate on HR/BP", alternative:"Bisoprolol or Carvedilol",
+    variants:[{rsid:"rs3892097",allele:"G>A",impact:"HIGH",gene:"CYP2D6",consequence:"Null allele"}],
+    geneImpact:71, references:["DPWG Metoprolol 2019"], category:"Beta Blocker",
   },
   TRAMADOL: {
-    gene: "CYP2D6", diplotype: "*1/*2", phenotype: "URM",
-    phenotypeLabel: "Ultrarapid Metabolizer",
-    risk: "Toxic", severity: "high", confidence: 0.85,
-    mechanism: "CYP2D6 ultrarapid metabolism converts tramadol to O-desmethyltramadol (M1) at excessive rates, causing opioid overdose syndrome including respiratory depression.",
-    whyRisk: "As a CYP2D6 ultrarapid metabolizer, your body converts tramadol to its active opioid metabolite so rapidly that standard analgesic doses can cause life-threatening respiratory depression — the same risk mechanism as codeine toxicity.",
-    cpic: "CPIC Level A", dosage: "Avoid tramadol — use non-CYP2D6 dependent analgesic", alternative: "Non-opioid: NSAIDs, acetaminophen, or gabapentin",
-    variants: [{ rsid: "rs16947", allele: "C>T", impact: "HIGH", gene: "CYP2D6", consequence: "Increased enzyme activity" }],
-    geneImpact: 87, references: ["CPIC Codeine/Tramadol 2014"], category: "Opioid Analgesic"
+    gene:"CYP2D6", diplotype:"*1/*2", phenotype:"URM", phenotypeLabel:"Ultrarapid Metabolizer",
+    risk:"Toxic", severity:"high", confidence:0.85,
+    mechanism:"URM converts tramadol to O-desmethyltramadol at excessive rates, causing opioid overdose syndrome.",
+    whyRisk:"Body converts tramadol to active opioid metabolite so rapidly that standard doses cause life-threatening respiratory depression.",
+    cpic:"CPIC Level A", dosage:"Avoid tramadol", alternative:"NSAIDs, acetaminophen, or gabapentin",
+    variants:[{rsid:"rs16947",allele:"C>T",impact:"HIGH",gene:"CYP2D6",consequence:"Increased enzyme activity"}],
+    geneImpact:87, references:["CPIC Codeine/Tramadol 2014"], category:"Opioid Analgesic",
   },
   TAMOXIFEN: {
-    gene: "CYP2D6", diplotype: "*4/*4", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Ineffective", severity: "high", confidence: 0.86,
-    mechanism: "CYP2D6 catalyzes tamoxifen conversion to endoxifen, its primary active metabolite responsible for breast cancer cell growth inhibition. Poor metabolizers produce inadequate endoxifen levels.",
-    whyRisk: "Your CYP2D6 poor metabolizer status results in endoxifen concentrations ~70-80% lower than normal metabolizers. Clinical studies show significantly reduced breast cancer recurrence-free survival in CYP2D6 poor metabolizers on tamoxifen.",
-    cpic: "CPIC Level A", dosage: "Tamoxifen may be insufficient — consider alternative endocrine therapy", alternative: "Aromatase inhibitor (Anastrozole, Letrozole) if post-menopausal",
-    variants: [{ rsid: "rs3892097", allele: "G>A", impact: "HIGH", gene: "CYP2D6", consequence: "Null allele — absent enzyme" }],
-    geneImpact: 86, references: ["PMID:22532592","CPIC Tamoxifen 2018"], category: "Hormone Therapy (Oncology)"
+    gene:"CYP2D6", diplotype:"*4/*4", phenotype:"PM", phenotypeLabel:"Poor Metabolizer",
+    risk:"Ineffective", severity:"high", confidence:0.86,
+    mechanism:"CYP2D6 catalyzes tamoxifen→endoxifen conversion. PM produces inadequate endoxifen for tumor suppression.",
+    whyRisk:"PM status results in endoxifen ~70-80% lower than NM. Significantly reduced cancer recurrence-free survival.",
+    cpic:"CPIC Level A", dosage:"Consider alternative endocrine therapy", alternative:"Aromatase inhibitor if post-menopausal",
+    variants:[{rsid:"rs3892097",allele:"G>A",impact:"HIGH",gene:"CYP2D6",consequence:"Null allele — absent enzyme"}],
+    geneImpact:86, references:["CPIC Tamoxifen 2018"], category:"Hormone Therapy (Oncology)",
   },
   IRINOTECAN: {
-    gene: "UGT1A1", diplotype: "*28/*28", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer (Reduced Glucuronidation)",
-    risk: "Toxic", severity: "critical", confidence: 0.92,
-    mechanism: "UGT1A1*28 reduces glucuronidation of SN-38 (active irinotecan metabolite), causing accumulation of this toxic topoisomerase inhibitor and severe GI and hematological toxicity.",
-    whyRisk: "The *28/*28 genotype (TA7 repeat) reduces UGT1A1 expression by ~70%. SN-38 accumulation causes grade 3-4 diarrhea in >40% of patients and life-threatening neutropenia. FDA label requires dose reduction for this genotype.",
-    cpic: "CPIC Level A", dosage: "Reduce starting dose by 25-50%; increase subsequent doses based on toxicity", alternative: "Oxaliplatin-based regimen if appropriate",
-    variants: [{ rsid: "rs887829", allele: "TA6>TA7", impact: "HIGH", gene: "UGT1A1", consequence: "*28 promoter repeat — reduced transcription" }],
-    geneImpact: 91, references: ["PMID:24587463","FDA Irinotecan Label 2014"], category: "Chemotherapy"
+    gene:"UGT1A1", diplotype:"*28/*28", phenotype:"PM", phenotypeLabel:"Poor Metabolizer",
+    risk:"Toxic", severity:"critical", confidence:0.92,
+    mechanism:"UGT1A1*28 reduces glucuronidation of SN-38, causing accumulation and severe GI/hematological toxicity.",
+    whyRisk:"*28/*28 reduces UGT1A1 expression ~70%. SN-38 accumulation causes grade 3-4 diarrhea in >40% and neutropenia.",
+    cpic:"CPIC Level A", dosage:"Reduce starting dose 25-50%", alternative:"Oxaliplatin-based regimen",
+    variants:[{rsid:"rs887829",allele:"TA6>TA7",impact:"HIGH",gene:"UGT1A1",consequence:"*28 promoter repeat"}],
+    geneImpact:91, references:["FDA Irinotecan Label 2014"], category:"Chemotherapy",
   },
   ALLOPURINOL: {
-    gene: "HLA-B", diplotype: "*58:01 carrier", phenotype: "Risk Allele",
-    phenotypeLabel: "Hypersensitivity Risk Carrier",
-    risk: "Toxic", severity: "critical", confidence: 0.97,
-    mechanism: "HLA-B*58:01 is strongly associated with allopurinol-induced severe cutaneous adverse reactions (SCAR) including Stevens-Johnson syndrome (SJS) and toxic epidermal necrolysis (TEN), with mortality rates up to 30%.",
-    whyRisk: "Carrying HLA-B*58:01 increases SJS/TEN risk from baseline 0.03% to 5-8% in Asian populations. The FDA label recommends screening for HLA-B*58:01 in high-risk populations before prescribing. This is a contraindication in multiple national guidelines.",
-    cpic: "CPIC Level A", dosage: "Avoid allopurinol — contraindicated", alternative: "Febuxostat (XO inhibitor, no HLA association) or Probenecid",
-    variants: [{ rsid: "rs2395029", allele: "HLA-B*58:01", impact: "HIGH", gene: "HLA-B", consequence: "Immune hypersensitivity risk variant" }],
-    geneImpact: 97, references: ["PMID:21228675","CPIC HLA 2015"], category: "Gout/Uric Acid"
+    gene:"HLA-B", diplotype:"*58:01 carrier", phenotype:"Risk Allele", phenotypeLabel:"Hypersensitivity Risk Carrier",
+    risk:"Toxic", severity:"critical", confidence:0.97,
+    mechanism:"HLA-B*58:01 strongly associated with SJS/TEN — fatal cutaneous reactions with mortality up to 30%.",
+    whyRisk:"HLA-B*58:01 raises SJS/TEN risk from 0.03% to 5-8%. FDA recommends screening in high-risk populations.",
+    cpic:"CPIC Level A", dosage:"Avoid allopurinol — contraindicated", alternative:"Febuxostat or Probenecid",
+    variants:[{rsid:"rs2395029",allele:"HLA-B*58:01",impact:"HIGH",gene:"HLA-B",consequence:"Immune hypersensitivity risk variant"}],
+    geneImpact:97, references:["CPIC HLA 2015"], category:"Gout/Uric Acid",
   },
   CARBAMAZEPINE: {
-    gene: "HLA-A + HLA-B", diplotype: "HLA-B*15:02 carrier", phenotype: "Risk Allele",
-    phenotypeLabel: "Hypersensitivity Risk Carrier",
-    risk: "Toxic", severity: "critical", confidence: 0.95,
-    mechanism: "HLA-B*15:02 confers high risk for carbamazepine-induced SJS/TEN in Asian populations. HLA-A*31:01 is associated with carbamazepine hypersensitivity syndrome (DRESS) across all ethnicities.",
-    whyRisk: "HLA-B*15:02 carriers have a 10% risk of SJS/TEN with carbamazepine — 40-80x higher than non-carriers. FDA mandates screening in patients of Asian ancestry before prescribing. This is a near-absolute contraindication.",
-    cpic: "CPIC Level A", dosage: "Avoid carbamazepine — use alternative anticonvulsant", alternative: "Valproate, Lamotrigine (HLA-test first), or Levetiracetam",
-    variants: [{ rsid: "rs3909184", allele: "HLA-B*15:02", impact: "HIGH", gene: "HLA-B", consequence: "Severe cutaneous reaction risk" }],
-    geneImpact: 95, references: ["PMID:21205684","FDA CBZ Label 2008"], category: "Anticonvulsant"
+    gene:"HLA-A + HLA-B", diplotype:"HLA-B*15:02 carrier", phenotype:"Risk Allele", phenotypeLabel:"Hypersensitivity Risk Carrier",
+    risk:"Toxic", severity:"critical", confidence:0.95,
+    mechanism:"HLA-B*15:02 confers high SJS/TEN risk. HLA-A*31:01 associated with DRESS across all ethnicities.",
+    whyRisk:"HLA-B*15:02 carriers have 10% SJS/TEN risk — 40-80x non-carriers. FDA mandates screening in Asian ancestry.",
+    cpic:"CPIC Level A", dosage:"Avoid carbamazepine", alternative:"Levetiracetam or Valproate",
+    variants:[{rsid:"rs3909184",allele:"HLA-B*15:02",impact:"HIGH",gene:"HLA-B",consequence:"Severe cutaneous reaction risk"}],
+    geneImpact:95, references:["FDA CBZ Label 2008"], category:"Anticonvulsant",
   },
   ONDANSETRON: {
-    gene: "CYP2D6", diplotype: "*1/*2", phenotype: "URM",
-    phenotypeLabel: "Ultrarapid Metabolizer",
-    risk: "Ineffective", severity: "low", confidence: 0.72,
-    mechanism: "CYP2D6 ultrarapid metabolizers clear ondansetron very rapidly, reducing plasma concentrations and antiemetic efficacy. This may lead to inadequate nausea/vomiting control.",
-    whyRisk: "Ultrarapid CYP2D6 metabolism reduces ondansetron AUC by ~60% vs normal metabolizers. In chemotherapy-induced nausea, subtherapeutic levels may necessitate dose escalation or alternative antiemetics.",
-    cpic: "CPIC Level B+", dosage: "May need dose increase or more frequent dosing; monitor antiemetic response", alternative: "Granisetron (not CYP2D6 dependent) or Dexamethasone-based regimens",
-    variants: [{ rsid: "rs16947", allele: "C>T", impact: "MODERATE", gene: "CYP2D6", consequence: "Increased enzyme copies" }],
-    geneImpact: 58, references: ["CPIC Ondansetron 2017"], category: "Antiemetic"
+    gene:"CYP2D6", diplotype:"*1/*2", phenotype:"URM", phenotypeLabel:"Ultrarapid Metabolizer",
+    risk:"Ineffective", severity:"low", confidence:0.72,
+    mechanism:"URM clears ondansetron rapidly, reducing plasma concentrations and antiemetic efficacy.",
+    whyRisk:"URM reduces ondansetron AUC ~60% vs NM. Subtherapeutic levels in chemo-induced nausea.",
+    cpic:"CPIC Level B+", dosage:"May need dose increase; monitor response", alternative:"Granisetron or Dexamethasone",
+    variants:[{rsid:"rs16947",allele:"C>T",impact:"MODERATE",gene:"CYP2D6",consequence:"Increased enzyme copies"}],
+    geneImpact:58, references:["CPIC Ondansetron 2017"], category:"Antiemetic",
   },
   SERTRALINE: {
-    gene: "CYP2C19 + CYP2D6", diplotype: "*1/*1 / *1/*1", phenotype: "NM",
-    phenotypeLabel: "Normal Metabolizer",
-    risk: "Safe", severity: "none", confidence: 0.81,
-    mechanism: "Sertraline is metabolized by multiple CYP enzymes. Normal metabolizer status predicts standard pharmacokinetics and typical antidepressant response.",
-    whyRisk: "Your metabolizer profile is normal for both primary sertraline-metabolizing enzymes. Standard dosing is expected to produce therapeutic plasma levels within the normal range. No genetic dose adjustment is indicated.",
-    cpic: "CPIC Level C", dosage: "Initiate at standard dose (50mg/day); titrate based on clinical response", alternative: "No pharmacogenomic-based alternative needed",
-    variants: [],
-    geneImpact: 15, references: ["CPIC SSRI 2015"], category: "Antidepressant (SSRI)"
+    gene:"CYP2C19 + CYP2D6", diplotype:"*1/*1 / *1/*1", phenotype:"NM", phenotypeLabel:"Normal Metabolizer",
+    risk:"Safe", severity:"none", confidence:0.81,
+    mechanism:"Normal metabolizer status predicts standard pharmacokinetics and typical antidepressant response.",
+    whyRisk:"Normal metabolizer for both primary enzymes. Standard dosing produces therapeutic levels within normal range.",
+    cpic:"CPIC Level C", dosage:"Standard 50mg/day; titrate on response", alternative:"No PGx-based alternative needed",
+    variants:[], geneImpact:15, references:["CPIC SSRI 2015"], category:"Antidepressant (SSRI)",
   },
   VORICONAZOLE: {
-    gene: "CYP2C19", diplotype: "*2/*2", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Toxic", severity: "high", confidence: 0.89,
-    mechanism: "CYP2C19 poor metabolizers accumulate voriconazole at 4-fold higher plasma concentrations, leading to neurotoxicity (hallucinations, encephalopathy), hepatotoxicity, and QTc prolongation.",
-    whyRisk: "Standard voriconazole doses in CYP2C19 poor metabolizers produce plasma levels consistently in the toxic range. Visual disturbances, hallucinations, and liver toxicity are markedly increased. Most guidelines recommend avoiding or drastically reducing doses.",
-    cpic: "CPIC Level A", dosage: "Reduce dose by 50% or consider therapeutic drug monitoring with target trough <5.5 mg/L", alternative: "Isavuconazole or Posaconazole (not CYP2C19 dependent)",
-    variants: [{ rsid: "rs4244285", allele: "G>A", impact: "HIGH", gene: "CYP2C19", consequence: "Loss-of-function *2 allele" }, { rsid: "rs4986893", allele: "G>A", impact: "HIGH", gene: "CYP2C19", consequence: "Loss-of-function *3 allele" }],
-    geneImpact: 88, references: ["CPIC Voriconazole 2016"], category: "Antifungal"
+    gene:"CYP2C19", diplotype:"*2/*2", phenotype:"PM", phenotypeLabel:"Poor Metabolizer",
+    risk:"Toxic", severity:"high", confidence:0.89,
+    mechanism:"CYP2C19 PM accumulates voriconazole 4-fold, causing neurotoxicity, hepatotoxicity, and QTc prolongation.",
+    whyRisk:"Standard doses in PM produce plasma levels consistently in toxic range.",
+    cpic:"CPIC Level A", dosage:"Reduce dose 50% or TDM with trough <5.5 mg/L", alternative:"Isavuconazole or Posaconazole",
+    variants:[{rsid:"rs4244285",allele:"G>A",impact:"HIGH",gene:"CYP2C19",consequence:"Loss-of-function *2"},{rsid:"rs4986893",allele:"G>A",impact:"HIGH",gene:"CYP2C19",consequence:"Loss-of-function *3"}],
+    geneImpact:88, references:["CPIC Voriconazole 2016"], category:"Antifungal",
   },
   TACROLIMUS: {
-    gene: "CYP3A5", diplotype: "*3/*3", phenotype: "PM",
-    phenotypeLabel: "Non-Expressor",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.84,
-    mechanism: "CYP3A5 *3/*3 homozygotes are non-expressors of CYP3A5, leading to reduced tacrolimus clearance and higher dose-adjusted trough concentrations, increasing nephrotoxicity risk.",
-    whyRisk: "As a CYP3A5 non-expressor, your tacrolimus dose requirements are significantly lower than expressors. Without dose adjustment, over-immunosuppression and nephrotoxicity are likely. Target trough monitoring is critical.",
-    cpic: "CPIC Level A", dosage: "Reduce starting dose by ~30%; guide by therapeutic drug monitoring (target trough 5-15 ng/mL)", alternative: "Cyclosporine with appropriate monitoring",
-    variants: [{ rsid: "rs776746", allele: "G>A", impact: "HIGH", gene: "CYP3A5", consequence: "*3 splice site — no CYP3A5 expression" }],
-    geneImpact: 82, references: ["CPIC Tacrolimus 2015","PMID:26479988"], category: "Immunosuppressant"
+    gene:"CYP3A5", diplotype:"*3/*3", phenotype:"PM", phenotypeLabel:"Non-Expressor",
+    risk:"Adjust Dosage", severity:"moderate", confidence:0.84,
+    mechanism:"CYP3A5 non-expressors have reduced tacrolimus clearance, increasing trough concentrations and nephrotoxicity.",
+    whyRisk:"Non-expressor dose requirements significantly lower than expressors. Over-immunosuppression likely without adjustment.",
+    cpic:"CPIC Level A", dosage:"Reduce starting dose ~30%; guide by TDM (target 5-15 ng/mL)", alternative:"Cyclosporine with monitoring",
+    variants:[{rsid:"rs776746",allele:"G>A",impact:"HIGH",gene:"CYP3A5",consequence:"*3 splice site — no expression"}],
+    geneImpact:82, references:["CPIC Tacrolimus 2015"], category:"Immunosuppressant",
   },
   PHENYTOIN: {
-    gene: "CYP2C9 + HLA-B", diplotype: "*1/*3 / HLA-B*15:02", phenotype: "IM + Risk",
-    phenotypeLabel: "Intermediate Metabolizer + Hypersensitivity Risk",
-    risk: "Toxic", severity: "high", confidence: 0.87,
-    mechanism: "CYP2C9*3 reduces phenytoin hydroxylation, causing drug accumulation and dose-dependent toxicity (ataxia, nystagmus). HLA-B*15:02 confers SJS/TEN risk independent of metabolism.",
-    whyRisk: "Dual risk: your CYP2C9 variant causes ~2x higher phenytoin exposure vs normal metabolizers, and HLA-B*15:02 carriage adds severe cutaneous hypersensitivity risk. Both risks necessitate alternative anticonvulsant selection.",
-    cpic: "CPIC Level A", dosage: "If phenytoin must be used, reduce dose by 25-50% with plasma level monitoring; avoid if HLA-B*15:02 positive", alternative: "Levetiracetam or Valproate (no CYP2C9 or HLA concern)",
-    variants: [{ rsid: "rs1057910", allele: "A>C", impact: "HIGH", gene: "CYP2C9", consequence: "p.Ile359Leu — *3 reduced activity allele" }],
-    geneImpact: 84, references: ["CPIC Phenytoin 2020"], category: "Anticonvulsant"
-  },
-  CAPECITABINE: {
-    gene: "DPYD", diplotype: "*2A/*1", phenotype: "IM",
-    phenotypeLabel: "Intermediate Metabolizer",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.77,
-    mechanism: "Capecitabine is a prodrug converted to fluorouracil. DPYD deficiency reduces 5-FU catabolism, causing systemic drug accumulation and enhanced toxicity.",
-    whyRisk: "The same DPYD risk that applies to 5-FU applies to capecitabine. Your *2A heterozygous status predicts ~50% reduced fluoropyrimidine clearance, requiring upfront dose reduction to avoid severe mucositis and myelosuppression.",
-    cpic: "CPIC Level A", dosage: "Reduce starting dose by 50%; escalate based on tolerance", alternative: "Non-fluoropyrimidine regimen if alternatives exist",
-    variants: [{ rsid: "rs3918290", allele: "C>T", impact: "HIGH", gene: "DPYD", consequence: "Splice site — exon 14 skipping" }],
-    geneImpact: 72, references: ["DPWG Fluoropyrimidine 2020"], category: "Chemotherapy"
+    gene:"CYP2C9 + HLA-B", diplotype:"*1/*3 / HLA-B*15:02", phenotype:"IM + Risk", phenotypeLabel:"Intermediate Metabolizer + Hypersensitivity Risk",
+    risk:"Toxic", severity:"high", confidence:0.87,
+    mechanism:"CYP2C9*3 reduces phenytoin hydroxylation causing accumulation. HLA-B*15:02 adds SJS/TEN risk.",
+    whyRisk:"Dual risk: ~2x higher phenytoin exposure plus severe cutaneous hypersensitivity risk.",
+    cpic:"CPIC Level A", dosage:"Reduce dose 25-50%; avoid if HLA-B*15:02 positive", alternative:"Levetiracetam or Valproate",
+    variants:[{rsid:"rs1057910",allele:"A>C",impact:"HIGH",gene:"CYP2C9",consequence:"p.Ile359Leu — *3 reduced activity"}],
+    geneImpact:84, references:["CPIC Phenytoin 2020"], category:"Anticonvulsant",
   },
   MERCAPTOPURINE: {
-    gene: "TPMT + NUDT15", diplotype: "*3A/*3A", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Toxic", severity: "critical", confidence: 0.98,
-    mechanism: "TPMT deficiency causes thioguanine nucleotide accumulation identical to azathioprine toxicity. Additionally, NUDT15 variants further impair thiopurine metabolism, causing additive myelosuppression risk.",
-    whyRisk: "TPMT *3A/*3A is the highest-risk thiopurine genotype — zero enzymatic activity. Standard mercaptopurine doses in pediatric ALL would cause profound bone marrow failure within 2-4 weeks. Dose reduction of 85-90% is mandatory.",
-    cpic: "CPIC Level A", dosage: "Reduce dose by 85-90%; weekly CBC monitoring required during initiation", alternative: "Methotrexate-based protocol modification",
-    variants: [{ rsid: "rs1800460", allele: "C>T", impact: "HIGH", gene: "TPMT", consequence: "*3A haplotype — null TPMT" }, { rsid: "rs1142345", allele: "T>C", impact: "HIGH", gene: "TPMT", consequence: "*3A haplotype — null TPMT" }],
-    geneImpact: 98, references: ["CPIC Thiopurine 2018"], category: "Chemotherapy (Leukemia)"
-  },
-  LOVASTATIN: {
-    gene: "SLCO1B1", diplotype: "*5/*5", phenotype: "PM",
-    phenotypeLabel: "Poor Transporter Function",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.79,
-    mechanism: "SLCO1B1 deficiency impairs hepatic lovastatin uptake, increasing systemic exposure and myopathy risk similarly to simvastatin but to a somewhat lesser degree.",
-    whyRisk: "Your SLCO1B1 *5/*5 genotype reduces lovastatin hepatic uptake, increasing systemic statin concentrations and myopathy risk. While less severe than simvastatin, significant caution is still warranted.",
-    cpic: "CPIC Level B", dosage: "Limit dose; consider statin with lower SLCO1B1 dependence", alternative: "Rosuvastatin or Pravastatin",
-    variants: [{ rsid: "rs4149056", allele: "T>C", impact: "HIGH", gene: "SLCO1B1", consequence: "p.Val174Ala" }],
-    geneImpact: 74, references: ["CPIC Statins 2022"], category: "Statin"
+    gene:"TPMT + NUDT15", diplotype:"*3A/*3A", phenotype:"PM", phenotypeLabel:"Poor Metabolizer",
+    risk:"Toxic", severity:"critical", confidence:0.98,
+    mechanism:"TPMT deficiency causes TGN accumulation. NUDT15 variants add additive myelosuppression risk.",
+    whyRisk:"*3A/*3A = zero activity. Standard doses cause profound bone marrow failure within 2-4 weeks. 85-90% dose reduction mandatory.",
+    cpic:"CPIC Level A", dosage:"Reduce dose 85-90%; weekly CBC monitoring", alternative:"Methotrexate-based protocol",
+    variants:[{rsid:"rs1800460",allele:"C>T",impact:"HIGH",gene:"TPMT",consequence:"*3A — null TPMT"},{rsid:"rs1142345",allele:"T>C",impact:"HIGH",gene:"TPMT",consequence:"*3A — null TPMT"}],
+    geneImpact:98, references:["CPIC Thiopurine 2018"], category:"Chemotherapy (Leukemia)",
   },
   ATORVASTATIN: {
-    gene: "SLCO1B1", diplotype: "*1/*5", phenotype: "IM",
-    phenotypeLabel: "Intermediate Transporter Function",
-    risk: "Safe", severity: "none", confidence: 0.75,
-    mechanism: "Atorvastatin shows moderate SLCO1B1 dependence. Heterozygous *5 carriers have modest increase in plasma concentrations but usually tolerate standard doses.",
-    whyRisk: "Your single copy of SLCO1B1*5 slightly increases atorvastatin exposure but not to a clinically significant degree for most patients. Standard doses are generally well-tolerated. Monitor for myalgia at high doses (>40mg).",
-    cpic: "CPIC Level B", dosage: "Standard dosing appropriate; monitor for myalgia at higher doses", alternative: "No change needed; Rosuvastatin if myalgia occurs",
-    variants: [{ rsid: "rs4149056", allele: "T>C", impact: "MODERATE", gene: "SLCO1B1", consequence: "p.Val174Ala — one copy" }],
-    geneImpact: 28, references: ["CPIC Statins 2022"], category: "Statin"
+    gene:"SLCO1B1", diplotype:"*1/*5", phenotype:"IM", phenotypeLabel:"Intermediate Transporter Function",
+    risk:"Safe", severity:"none", confidence:0.75,
+    mechanism:"Heterozygous *5 carriers have modest plasma concentration increase but usually tolerate standard doses.",
+    whyRisk:"Single *5 copy slightly increases exposure but not to clinically significant degree. Monitor for myalgia at high doses.",
+    cpic:"CPIC Level B", dosage:"Standard dosing; monitor myalgia at >40mg", alternative:"Rosuvastatin if myalgia occurs",
+    variants:[{rsid:"rs4149056",allele:"T>C",impact:"MODERATE",gene:"SLCO1B1",consequence:"p.Val174Ala — one copy"}],
+    geneImpact:28, references:["CPIC Statins 2022"], category:"Statin",
   },
 };
 
 const generateGenericDrug = (drugName) => ({
-  gene: "CYP2D6", diplotype: "*1/*1", phenotype: "NM",
-  phenotypeLabel: "Normal Metabolizer",
-  risk: "Safe", severity: "none", confidence: 0.70 + Math.random()*0.15,
-  mechanism: `${drugName} is primarily metabolized via CYP2D6. Normal metabolizer status predicts standard pharmacokinetics and expected therapeutic response at standard doses.`,
-  whyRisk: `Your genetic profile shows normal metabolizer status for ${drugName}'s primary metabolic pathway. No significant pharmacogenomic interactions are predicted. Standard dosing and monitoring is recommended per clinical guidelines.`,
-  cpic: "CPIC Level C", dosage: "Standard dosing per clinical guidelines; no pharmacogenomic adjustment indicated", alternative: "No pharmacogenomic-based alternative needed",
-  variants: [], geneImpact: 10 + Math.floor(Math.random()*25), references: ["Clinical Pharmacogenetics Implementation Consortium"], category: "Medication"
+  gene:"CYP2D6", diplotype:"*1/*1", phenotype:"NM", phenotypeLabel:"Normal Metabolizer",
+  risk:"Safe", severity:"none", confidence: parseFloat((0.70 + Math.random()*0.15).toFixed(2)),
+  mechanism:`${drugName} is primarily metabolized via CYP2D6. Normal metabolizer status predicts standard pharmacokinetics and expected therapeutic response at standard doses.`,
+  whyRisk:`Your genetic profile shows normal metabolizer status for ${drugName}. No significant pharmacogenomic interactions predicted. Standard dosing recommended per clinical guidelines.`,
+  cpic:"CPIC Level C", dosage:"Standard dosing; no PGx adjustment indicated", alternative:"No PGx-based alternative needed",
+  variants:[], geneImpact: 10 + Math.floor(Math.random()*25),
+  references:["Clinical Pharmacogenetics Implementation Consortium"], category:"Medication",
 });
+
+// ─── LOCAL ANALYSIS (no backend) ─────────────────────────────────────────────
+const runAnalysis = async (fileInfo, drugs) => {
+  await new Promise(r => setTimeout(r, 2200));
+  const drugResults = {};
+  for (const drug of drugs) {
+    drugResults[drug] = DRUG_DATABASE[drug] || {
+      ...generateGenericDrug(drug),
+      confidence: parseFloat((0.68 + Math.random()*0.18).toFixed(2)),
+    };
+  }
+  const summary = {
+    highRisk:    drugs.filter(d => drugResults[d]?.risk === "Toxic"),
+    adjustDosage:drugs.filter(d => drugResults[d]?.risk === "Adjust Dosage"),
+    ineffective: drugs.filter(d => drugResults[d]?.risk === "Ineffective"),
+    safe:        drugs.filter(d => drugResults[d]?.risk === "Safe"),
+  };
+  return {
+    sampleId: fileInfo.sampleId,
+    analyzedAt: new Date().toISOString(),
+    drugs: drugResults,
+    summary,
+    alert: summary.highRisk.length > 0
+      ? `⚠ CRITICAL ALERT: High toxicity risk for ${summary.highRisk.join(", ")}. Immediate prescriber notification recommended.`
+      : summary.ineffective.length > 0
+        ? `⚠ WARNING: Predicted subtherapeutic response for ${summary.ineffective.join(", ")}. Alternative therapy recommended.`
+        : null,
+    vcfQuality:{ parsingSuccess: fileInfo.quality||98.2, variantConfidence:94.1, annotationCoverage:91.7, pgxVariants: fileInfo.pgxGenes?.length||0 },
+  };
+};
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_CONFIG = {
-  "Safe":          { color: "#00CFC1", bg: "rgba(0,207,193,0.1)", border: "rgba(0,207,193,0.25)", icon: "🛡️", label: "Safe", textColor: "#b8f5f0" },
-  "Adjust Dosage": { color: "#f59e0b", bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.28)", icon: "⚖️", label: "Adjust Dosage", textColor: "#fde68a" },
-  "Ineffective":   { color: "#F05444", bg: "rgba(240,84,68,0.1)", border: "rgba(240,84,68,0.28)", icon: "🚫", label: "Ineffective", textColor: "#ffbdb5" },
-  "Toxic":         { color: "#8B2F2F", bg: "rgba(139,47,47,0.15)", border: "rgba(139,47,47,0.4)", icon: "☠️", label: "Toxic", textColor: "#ffbdb5" },
-  "Unknown":       { color: "#94a3b8", bg: "rgba(148,163,184,0.08)", border: "rgba(148,163,184,0.2)", icon: "❓", label: "Unknown", textColor: "#cbd5e1" },
+  "Safe":          { color:"#20C997", bg:"rgba(32,201,151,0.08)",  border:"rgba(32,201,151,0.25)", icon:"🛡️", label:"Safe",          textColor:"#155a44" },
+  "Adjust Dosage": { color:"#f59e0b", bg:"rgba(245,158,11,0.08)",  border:"rgba(245,158,11,0.28)", icon:"⚖️", label:"Adjust Dosage", textColor:"#7c5a00" },
+  "Ineffective":   { color:"#ef4444", bg:"rgba(239,68,68,0.08)",   border:"rgba(239,68,68,0.28)",  icon:"🚫", label:"Ineffective",   textColor:"#8B2F2F" },
+  "Toxic":         { color:"#dc2626", bg:"rgba(220,38,38,0.08)",   border:"rgba(220,38,38,0.35)",  icon:"☠️", label:"Toxic",         textColor:"#7f1d1d" },
+  "Unknown":       { color:"#6c757d", bg:"rgba(108,117,125,0.06)", border:"rgba(108,117,125,0.2)", icon:"❓", label:"Unknown",       textColor:"#495057" },
 };
-
 const SEVERITY_CONFIG = {
-  none:     { color: "#00CFC1", label: "None" },
-  low:      { color: "#4de8db", label: "Low" },
-  moderate: { color: "#f59e0b", label: "Moderate" },
-  high:     { color: "#F05444", label: "High" },
-  critical: { color: "#8B2F2F", label: "Critical" },
+  none:     { color:"#20C997", label:"None"     },
+  low:      { color:"#6EA8FE", label:"Low"      },
+  moderate: { color:"#f59e0b", label:"Moderate" },
+  high:     { color:"#ef4444", label:"High"     },
+  critical: { color:"#dc2626", label:"Critical" },
 };
+const PHENOTYPE_LABELS = { PM:"Poor Metabolizer", IM:"Intermediate Metabolizer", NM:"Normal Metabolizer", RM:"Rapid Metabolizer", URM:"Ultrarapid Metabolizer", Unknown:"Unknown" };
 
-const PHENOTYPE_LABELS = { PM: "Poor Metabolizer", IM: "Intermediate Metabolizer", NM: "Normal Metabolizer", RM: "Rapid Metabolizer", URM: "Ultrarapid Metabolizer", Unknown: "Unknown" };
-
-// ─── STYLES ──────────────────────────────────────────────────────────────────
+// ─── STYLES ───────────────────────────────────────────────────────────────────
 const injectStyles = () => {
-  if (document.getElementById("pg-styles-v3")) return;
+  if (document.getElementById("pg-styles-v4")) return;
   const s = document.createElement("style");
-  s.id = "pg-styles-v3";
+  s.id = "pg-styles-v4";
   s.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700;800;900&display=swap');
-    *{box-sizing:border-box;margin:0;padding:0;}
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700;800;900&family=Syne:wght@600;700;800&display=swap');
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
     html{scroll-behavior:smooth;}
-    body{background:#060e0f;color:#d4dbe8;font-family:'DM Sans',sans-serif;}
+    body{background:#F8F9FA;color:#212529;font-family:'DM Sans',sans-serif;}
     ::-webkit-scrollbar{width:5px;height:5px;}
-    ::-webkit-scrollbar-track{background:#0d1a1c;}
-    ::-webkit-scrollbar-thumb{background:#0a3540;border-radius:3px;}
+    ::-webkit-scrollbar-track{background:#e8ecf0;}
+    ::-webkit-scrollbar-thumb{background:#6EA8FE;border-radius:3px;}
 
     @keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
     @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.45;}}
-    @keyframes spin{to{transform:rotate(360deg);}}
     @keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
-    @keyframes glow{0%,100%{box-shadow:0 0 15px rgba(0,207,193,0.15);}50%{box-shadow:0 0 35px rgba(0,207,193,0.4);}}
+    @keyframes glow{0%,100%{box-shadow:0 0 15px rgba(11,94,215,0.15);}50%{box-shadow:0 0 35px rgba(11,94,215,0.35);}}
     @keyframes scanLine{0%{top:-2px;}100%{top:100%;}}
     @keyframes slideInRight{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
-    @keyframes barGrow{from{width:0;}to{width:var(--w);}}
     @keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
-    @keyframes ripple{0%{transform:scale(0);opacity:0.8;}100%{transform:scale(4);opacity:0;}}
-    @keyframes dnaFloat{0%{transform:translateY(0) scale(1);opacity:0.7;}50%{transform:translateY(-18px) scale(1.1);opacity:1;}100%{transform:translateY(0) scale(1);opacity:0.7;}}
     @keyframes countUp{from{opacity:0;transform:scale(0.8);}to{opacity:1;transform:scale(1);}}
     @keyframes modalIn{from{opacity:0;transform:scale(0.92);}to{opacity:1;transform:scale(1);}}
 
@@ -388,59 +377,54 @@ const injectStyles = () => {
     .pg-float{animation:float 3s ease-in-out infinite;}
     .pg-glow{animation:glow 2.5s ease-in-out infinite;}
 
-    .pg-btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:9px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;transition:all 0.18s;position:relative;overflow:hidden;}
+    .pg-btn{display:inline-flex;align-items:center;gap:7px;padding:10px 20px;border-radius:10px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;transition:all 0.18s;position:relative;overflow:hidden;}
     .pg-btn:hover{transform:translateY(-2px);}
     .pg-btn:active{transform:translateY(0);}
-    .pg-btn-primary{background:linear-gradient(135deg,#00CFC1,#0F5F73);color:#fff;box-shadow:0 4px 18px rgba(0,207,193,0.3);}
-    .pg-btn-primary:hover{box-shadow:0 6px 26px rgba(0,207,193,0.5);}
-    .pg-btn-success{background:linear-gradient(135deg,#00CFC1,#0F5F73);color:#fff;box-shadow:0 4px 18px rgba(0,207,193,0.28);}
-    .pg-btn-danger{background:linear-gradient(135deg,#F05444,#8B2F2F);color:#fff;box-shadow:0 4px 18px rgba(240,84,68,0.28);}
-    .pg-btn-ghost{background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);}
-    .pg-btn-ghost:hover{background:rgba(255,255,255,0.11);color:#d4dbe8;}
-    .pg-btn-warning{background:linear-gradient(135deg,#f59e0b,#b45309);color:#fff;box-shadow:0 4px 18px rgba(245,158,11,0.28);}
+    .pg-btn-primary{background:linear-gradient(135deg,#0B5ED7,#094bb3);color:#fff;box-shadow:0 4px 18px rgba(11,94,215,0.3);}
+    .pg-btn-primary:hover{box-shadow:0 6px 28px rgba(11,94,215,0.45);}
+    .pg-btn-success{background:linear-gradient(135deg,#20C997,#17a880);color:#fff;box-shadow:0 4px 18px rgba(32,201,151,0.28);}
+    .pg-btn-ghost{background:#fff;color:#495057;border:1.5px solid rgba(11,94,215,0.18);}
+    .pg-btn-ghost:hover{background:#F8F9FA;color:#0B5ED7;border-color:#0B5ED7;}
 
-    .pg-card{background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.075);border-radius:14px;padding:22px;backdrop-filter:blur(10px);transition:all 0.25s;}
-    .pg-card:hover{border-color:rgba(255,255,255,0.13);}
+    .pg-card{background:#fff;border:1.5px solid rgba(11,94,215,0.1);border-radius:16px;padding:22px;box-shadow:0 2px 12px rgba(11,94,215,0.06);transition:all 0.25s;}
+    .pg-card:hover{border-color:rgba(11,94,215,0.2);box-shadow:0 6px 24px rgba(11,94,215,0.1);}
 
-    .pg-input{background:rgba(255,255,255,0.055);border:1px solid rgba(255,255,255,0.1);border-radius:9px;padding:9px 13px;color:#d4dbe8;font-family:'DM Sans',sans-serif;font-size:13px;width:100%;outline:none;transition:all 0.2s;}
-    .pg-input:focus{border-color:#00CFC1;box-shadow:0 0 0 3px rgba(0,207,193,0.18);}
-    .pg-input::placeholder{color:#475569;}
+    .pg-input{background:#fff;border:1.5px solid #dee2e6;border-radius:9px;padding:10px 14px;color:#212529;font-family:'DM Sans',sans-serif;font-size:13px;width:100%;outline:none;transition:all 0.2s;}
+    .pg-input:focus{border-color:#0B5ED7;box-shadow:0 0 0 3px rgba(11,94,215,0.12);}
+    .pg-input::placeholder{color:#adb5bd;}
 
-    .pg-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:0.3px;}
-
+    .pg-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:100px;font-size:11px;font-weight:600;letter-spacing:0.3px;}
     .pg-progress-ring{transition:stroke-dashoffset 0.9s cubic-bezier(0.4,0,0.2,1);}
 
     .accordion-content{max-height:0;overflow:hidden;transition:max-height 0.4s ease,opacity 0.3s ease;opacity:0;}
     .accordion-content.open{max-height:3000px;opacity:1;}
 
     .drop-zone{transition:all 0.25s;}
-    .drop-zone.dragging{border-color:#00CFC1!important;background:rgba(0,207,193,0.08)!important;transform:scale(1.005);}
+    .drop-zone.dragging{border-color:#0B5ED7!important;background:rgba(11,94,215,0.06)!important;transform:scale(1.005);}
 
-    .tab-btn{padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;transition:all 0.18s;background:transparent;color:#64748b;letter-spacing:0.3px;}
-    .tab-btn.active{background:rgba(0,207,193,0.18);color:#4de8db;}
-    .tab-btn:hover:not(.active){background:rgba(255,255,255,0.05);color:#94a3b8;}
+    .tab-btn{padding:7px 16px;border-radius:8px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;transition:all 0.18s;background:transparent;color:#6c757d;}
+    .tab-btn.active{background:rgba(11,94,215,0.1);color:#0B5ED7;}
+    .tab-btn:hover:not(.active){background:rgba(11,94,215,0.05);color:#495057;}
 
-    .nav-link{transition:all 0.2s;position:relative;}
-    .nav-link::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;background:#00CFC1;transform:scaleX(0);transition:transform 0.2s;border-radius:1px;}
+    .nav-link{transition:all 0.2s;position:relative;cursor:pointer;}
+    .nav-link::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;background:#0B5ED7;transform:scaleX(0);transition:transform 0.2s;border-radius:1px;}
     .nav-link:hover::after,.nav-link.active::after{transform:scaleX(1);}
 
-    .notification{position:fixed;top:72px;right:18px;z-index:9999;padding:11px 18px;border-radius:11px;font-size:13px;font-weight:500;animation:slideInRight 0.3s ease;box-shadow:0 8px 30px rgba(0,0,0,0.5);max-width:340px;}
+    .notification{position:fixed;top:72px;right:18px;z-index:9999;padding:11px 18px;border-radius:11px;font-size:13px;font-weight:500;animation:slideInRight 0.3s ease;box-shadow:0 8px 30px rgba(11,94,215,0.15);max-width:340px;background:#fff;color:#212529;}
 
-    .sidebar{position:fixed;top:0;right:-390px;height:100vh;width:360px;background:#091415;border-left:1px solid rgba(255,255,255,0.08);z-index:200;transition:right 0.32s cubic-bezier(0.4,0,0.2,1);overflow-y:auto;padding:22px;}
+    .sidebar{position:fixed;top:0;right:-390px;height:100vh;width:360px;background:#fff;border-left:1.5px solid rgba(11,94,215,0.1);z-index:200;transition:right 0.32s cubic-bezier(0.4,0,0.2,1);overflow-y:auto;padding:22px;box-shadow:-8px 0 40px rgba(11,94,215,0.08);}
     .sidebar.open{right:0;}
-    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:199;backdrop-filter:blur(4px);}
+    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(33,37,41,0.35);z-index:199;backdrop-filter:blur(4px);}
     .sidebar-overlay.open{display:block;}
 
-    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);padding:20px;}
-    .modal-box{background:#091415;border:1px solid rgba(255,255,255,0.1);border-radius:18px;max-width:620px;width:100%;max-height:85vh;overflow-y:auto;animation:modalIn 0.25s ease;box-shadow:0 25px 60px rgba(0,0,0,0.6);}
-
-    .shimmer-loading{background:linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.09) 50%,rgba(255,255,255,0.04) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;}
+    .modal-overlay{position:fixed;inset:0;background:rgba(33,37,41,0.55);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);padding:20px;}
+    .modal-box{background:#fff;border:1.5px solid rgba(11,94,215,0.15);border-radius:18px;max-width:620px;width:100%;max-height:85vh;overflow-y:auto;animation:modalIn 0.25s ease;box-shadow:0 25px 60px rgba(11,94,215,0.18);}
 
     .scan-effect{position:relative;overflow:hidden;}
-    .scan-effect::after{content:'';position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(0,207,193,0.7),transparent);animation:scanLine 2.5s linear infinite;}
+    .scan-effect::after{content:'';position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(11,94,215,0.5),transparent);animation:scanLine 2.5s linear infinite;}
 
     .risk-card-enter{animation:fadeUp 0.45s ease both;}
-
+    .gradient-text{background:linear-gradient(135deg,#0B5ED7,#20C997);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
     .mono{font-family:'DM Mono',monospace;}
     .fraunces{font-family:'Fraunces',serif;}
 
@@ -448,8 +432,8 @@ const injectStyles = () => {
     .grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;}
     .grid-4{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
 
-    .info-btn{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#94a3b8;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0;}
-    .info-btn:hover{background:rgba(0,207,193,0.2);border-color:#00CFC1;color:#4de8db;transform:scale(1.1);}
+    .info-btn{width:26px;height:26px;border-radius:50%;background:rgba(11,94,215,0.07);border:1px solid rgba(11,94,215,0.18);color:#6c757d;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0;}
+    .info-btn:hover{background:rgba(11,94,215,0.14);border-color:#0B5ED7;color:#0B5ED7;transform:scale(1.1);}
 
     @media(max-width:768px){.pg-card{padding:14px;}.hide-mobile{display:none!important;}}
     @media(min-width:769px){.hide-desktop{display:none!important;}}
@@ -459,194 +443,75 @@ const injectStyles = () => {
 
 // ─── NOTIFICATION ─────────────────────────────────────────────────────────────
 let notifTimer;
-const showNotif = (msg, type = "info") => {
+const showNotif = (msg, type="info") => {
   const existing = document.getElementById("pg-notif");
   if (existing) existing.remove();
   const el = document.createElement("div");
   el.id = "pg-notif";
   el.className = "notification";
-  const c = { success:"#00CFC1", error:"#F05444", info:"#00CFC1", warning:"#f59e0b" };
-  el.style.cssText = `background:rgba(7,16,31,0.97);border:1px solid ${c[type]}40;color:#d4dbe8;`;
+  const c = { success:"#20C997", error:"#ef4444", info:"#0B5ED7", warning:"#f59e0b" };
+  el.style.cssText = `border:1px solid ${c[type]}40;`;
   el.innerHTML = `<span style="color:${c[type]};margin-right:8px">${type==="success"?"✓":type==="error"?"✗":type==="warning"?"⚠":"ℹ"}</span>${msg}`;
   document.body.appendChild(el);
   clearTimeout(notifTimer);
   notifTimer = setTimeout(() => el.remove(), 3500);
 };
 
-// ─── JSON BUILDER ──────────────────────────────────────────────────────────────
-const buildClinicalJSON = (results, fileInfo) => {
-  const output = {
-    report_metadata: {
-      report_id: `PG-${Date.now()}`,
-      generated_at: new Date().toISOString(),
-      generator: "PharmaGuard v3.0",
-      guideline_version: "CPIC 2024",
-      report_type: "Pharmacogenomic Drug Interaction Report",
-      institution: "Clinical Pharmacogenomics Laboratory",
-      vcf_file_format: fileInfo?.fileformat || "VCFv4.2",
-      disclaimer: "FOR CLINICAL DECISION SUPPORT ONLY. Not a substitute for professional medical judgment."
-    },
-    patient_sample: {
-      patient_id: fileInfo?.sampleId || results?.sampleId,
-      sample_id: results?.sampleId,
-      vcf_reference: fileInfo?.metadata?.reference || "GRCh38",
-      sample_source: fileInfo?.samples?.[0] || "Unknown"
-    },
-    genomic_summary: {
-      total_variants: fileInfo?.variants || 0,
-      pgx_genes_detected: fileInfo?.pgxGenes || [],
-      pgx_gene_count: fileInfo?.pgxGenes?.length || 0,
-      vcf_quality_score: fileInfo?.quality || null
-    },
-    drug_analyses: Object.entries(results.drugs).map(([drug, data]) => ({
-      patient_id: fileInfo?.sampleId || results?.sampleId,
-      drug: drug,
-      drug_category: data.category || "Medication",
-      timestamp: results.analyzedAt,
-      risk_assessment: {
-        risk_label: data.risk,
-        confidence_score: parseFloat((data.confidence || 0).toFixed(3)),
-        severity: data.severity || "none",
-        severity_label: SEVERITY_CONFIG[data.severity]?.label || "Unknown"
-      },
-      pharmacogenomic_profile: {
-        primary_gene: data.gene,
-        diplotype: data.diplotype || "Unknown",
-        phenotype: data.phenotype || "Unknown",
-        phenotype_label: data.phenotypeLabel || PHENOTYPE_LABELS[data.phenotype] || "Unknown",
-        detected_variants: (data.variants || []).map(v => ({
-          rsid: v.rsid || v.id,
-          allele_change: v.allele,
-          impact_level: v.impact,
-          gene: v.gene || data.gene,
-          functional_consequence: v.consequence || "Unknown"
-        })),
-        gene_impact_score: data.geneImpact || 0
-      },
-      clinical_recommendation: {
-        cpic_level: data.cpic || "Not classified",
-        dosage_guidance: data.dosage || "Standard dosing",
-        alternative_drug: data.alternative || "None specified",
-        monitoring_required: ["Adjust Dosage","Toxic"].includes(data.risk)
-      },
-      llm_generated_explanation: {
-        summary: data.mechanism || "",
-        why_this_risk: data.whyRisk || "",
-        references: data.references || []
-      },
-      quality_metrics: {
-        vcf_parsing_success: true,
-        variant_confidence: parseFloat((data.confidence || 0).toFixed(3)),
-        annotation_coverage: parseFloat(((data.geneImpact || 50) / 100).toFixed(3)),
-        pgx_variants_detected: (data.variants || []).length
-      }
-    })),
-    analysis_summary: {
-      total_drugs_analyzed: Object.keys(results.drugs).length,
-      high_risk_drugs: results.summary?.highRisk || [],
-      dosage_adjustment_drugs: results.summary?.adjustDosage || [],
-      ineffective_drugs: results.summary?.ineffective || [],
-      safe_drugs: results.summary?.safe || [],
-      clinical_alert: results.alert || null
-    },
-    quality_metrics: {
-      vcf_parsing_success: true,
-      variant_confidence: (results.vcfQuality?.variantConfidence || 94.1) / 100,
-      annotation_coverage: (results.vcfQuality?.annotationCoverage || 91.7) / 100,
-      pgx_variants_detected: results.vcfQuality?.pgxVariants || 0,
-      overall_report_confidence: parseFloat((Object.values(results.drugs).reduce((acc, d) => acc + (d.confidence || 0), 0) / Object.values(results.drugs).length).toFixed(3))
-    }
-  };
-  return output;
-};
-
-// ─── ANALYZE FUNCTION ─────────────────────────────────────────────────────────
-const runAnalysis = async (fileInfo, drugs) => {
-  await new Promise(r => setTimeout(r, 2200));
-  const drugResults = {};
-  for (const drug of drugs) {
-    drugResults[drug] = DRUG_DATABASE[drug] || { ...generateGenericDrug(drug), confidence: parseFloat((0.68 + Math.random()*0.18).toFixed(2)) };
-  }
-  const summary = {
-    highRisk: drugs.filter(d => drugResults[d]?.risk === "Toxic"),
-    adjustDosage: drugs.filter(d => drugResults[d]?.risk === "Adjust Dosage"),
-    ineffective: drugs.filter(d => drugResults[d]?.risk === "Ineffective"),
-    safe: drugs.filter(d => drugResults[d]?.risk === "Safe"),
-  };
-  const hasToxic = summary.highRisk.length > 0;
-  const hasIneffective = summary.ineffective.length > 0;
-  return {
-    sampleId: fileInfo.sampleId,
-    analyzedAt: new Date().toISOString(),
-    drugs: drugResults,
-    summary,
-    alert: hasToxic
-      ? `⚠ CRITICAL ALERT: High toxicity risk detected for ${summary.highRisk.join(", ")}. Immediate prescriber notification recommended.`
-      : hasIneffective
-        ? `⚠ WARNING: Predicted subtherapeutic response for ${summary.ineffective.join(", ")}. Alternative therapy recommended.`
-        : null,
-    vcfQuality: { parsingSuccess: fileInfo.quality || 98.2, variantConfidence: 94.1, annotationCoverage: 91.7, pgxVariants: fileInfo.pgxGenes?.length || 0 },
-  };
-};
+// ─── JSON BUILDER ─────────────────────────────────────────────────────────────
+const buildClinicalJSON = (results, fileInfo) => ({
+  report_metadata:{ report_id:`PG-${Date.now()}`, generated_at:new Date().toISOString(), generator:"PharmaGuard v3.0", guideline_version:"CPIC 2024", vcf_file_format:fileInfo?.fileformat||"VCFv4.2", disclaimer:"FOR CLINICAL DECISION SUPPORT ONLY." },
+  patient_sample:{ patient_id:fileInfo?.sampleId||results?.sampleId, vcf_reference:fileInfo?.metadata?.reference||"GRCh38" },
+  genomic_summary:{ total_variants:fileInfo?.variants||0, pgx_genes_detected:fileInfo?.pgxGenes||[], vcf_quality_score:fileInfo?.quality||null },
+  drug_analyses: Object.entries(results.drugs).map(([drug,data]) => ({
+    drug, risk_label:data.risk, confidence:parseFloat((data.confidence||0).toFixed(3)),
+    gene:data.gene, diplotype:data.diplotype, phenotype:data.phenotypeLabel,
+    cpic:data.cpic, dosage:data.dosage, alternative:data.alternative,
+  })),
+  analysis_summary:{ total:Object.keys(results.drugs).length, high_risk:results.summary?.highRisk||[], adjust:results.summary?.adjustDosage||[], ineffective:results.summary?.ineffective||[], safe:results.summary?.safe||[], alert:results.alert||null },
+});
 
 // ─── SUB-COMPONENTS ───────────────────────────────────────────────────────────
-function CircularProgress({ value, size = 76, color = "#00CFC1", label }) {
-  const r = (size - 8) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (value / 100) * circ;
+function CircularProgress({ value, size=76, color="#0B5ED7", label }) {
+  const r=(size-8)/2, circ=2*Math.PI*r, offset=circ-(value/100)*circ;
   return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
-      <svg width={size} height={size} style={{ transform:"rotate(-90deg)" }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={6} />
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={6}
-          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          className="pg-progress-ring" />
-        <text x={size/2} y={size/2} textAnchor="middle" dominantBaseline="middle"
-          fill="#d4dbe8" fontSize={12} fontWeight={600} fontFamily="DM Mono, monospace"
-          style={{ transform:`rotate(90deg)`, transformOrigin:`${size/2}px ${size/2}px` }}>
-          {Math.round(value)}%
-        </text>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+      <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(11,94,215,0.1)" strokeWidth={6}/>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={6} strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" className="pg-progress-ring"/>
+        <text x={size/2} y={size/2} textAnchor="middle" dominantBaseline="middle" fill="#212529" fontSize={12} fontWeight={600} fontFamily="DM Mono,monospace" style={{transform:`rotate(90deg)`,transformOrigin:`${size/2}px ${size/2}px`}}>{Math.round(value)}%</text>
       </svg>
-      {label && <span style={{ fontSize:10, color:"#64748b", fontWeight:600, letterSpacing:1 }}>{label}</span>}
+      {label && <span style={{fontSize:10,color:"#6c757d",fontWeight:600,letterSpacing:1}}>{label}</span>}
     </div>
   );
 }
 
 function MiniBarChart({ value, color, label }) {
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:10, margin:"4px 0" }}>
-      <span style={{ fontSize:11, color:"#64748b", width:90, flexShrink:0, fontWeight:500 }}>{label}</span>
-      <div style={{ flex:1, height:7, background:"rgba(255,255,255,0.05)", borderRadius:4, overflow:"hidden" }}>
-        <div style={{ height:"100%", width:`${value}%`, background:color, borderRadius:4, transition:"width 1.2s cubic-bezier(0.4,0,0.2,1)", boxShadow:`0 0 6px ${color}50` }} />
+    <div style={{display:"flex",alignItems:"center",gap:10,margin:"4px 0"}}>
+      <span style={{fontSize:11,color:"#6c757d",width:90,flexShrink:0,fontWeight:500}}>{label}</span>
+      <div style={{flex:1,height:7,background:"rgba(11,94,215,0.07)",borderRadius:4,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${value}%`,background:color,borderRadius:4,transition:"width 1.2s cubic-bezier(0.4,0,0.2,1)"}}/>
       </div>
-      <span className="mono" style={{ fontSize:10, color, width:32, textAlign:"right", fontWeight:500 }}>{value}%</span>
+      <span className="mono" style={{fontSize:10,color,width:32,textAlign:"right",fontWeight:500}}>{value}%</span>
     </div>
   );
 }
 
 function DNALoader() {
   return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:22, padding:40 }}>
-      <div style={{ position:"relative", width:72, height:80 }}>
-        {[0,1,2,3,4,5,6,7].map(i => (
-          <div key={i} style={{
-            position:"absolute", width:11, height:11, borderRadius:"50%",
-            background: "#00CFC1",
-            left: 18 + Math.sin(i*0.9)*22, top: i*10,
-            animationDelay:`${i*0.15}s`,
-            boxShadow: "0 0 8px #00CFC1"
-          }} />
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:22,padding:40}}>
+      <div style={{position:"relative",width:72,height:80}}>
+        {[0,1,2,3,4,5,6,7].map(i=>(
+          <div key={i} style={{position:"absolute",width:11,height:11,borderRadius:"50%",background:i%2===0?"#0B5ED7":"#20C997",left:18+Math.sin(i*0.9)*22,top:i*10,animationDelay:`${i*0.15}s`,boxShadow:i%2===0?"0 0 8px rgba(11,94,215,0.5)":"0 0 8px rgba(32,201,151,0.5)"}}/>
         ))}
       </div>
-      <div style={{ textAlign:"center" }}>
-        <div style={{ fontSize:17, fontWeight:700, color:"#d4dbe8", marginBottom:7 }}>Analyzing Genetic Profile</div>
-        <div className="mono" style={{ fontSize:12, color:"#64748b" }}>Running CPIC pharmacogenomic pipeline...</div>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:17,fontWeight:700,color:"#212529",marginBottom:7}}>Analyzing Genetic Profile</div>
+        <div className="mono" style={{fontSize:12,color:"#6c757d"}}>Running CPIC pharmacogenomic pipeline...</div>
       </div>
-      <div style={{ display:"flex", gap:10, flexWrap:"wrap", justifyContent:"center" }}>
-        {["Parsing VCF","Mapping alleles","Querying CPIC DB","Generating report"].map((s,i) => (
-          <span key={s} className="pg-badge" style={{ background:"rgba(0,207,193,0.12)", color:"#4de8db", border:"1px solid rgba(0,207,193,0.22)", animation:`pulse ${1.2+i*0.25}s infinite` }}>
-            ⟳ {s}
-          </span>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",justifyContent:"center"}}>
+        {["Parsing VCF","Mapping alleles","Querying CPIC DB","Generating report"].map((s,i)=>(
+          <span key={s} className="pg-badge" style={{background:"rgba(11,94,215,0.08)",color:"#0B5ED7",border:"1px solid rgba(11,94,215,0.2)",animation:`pulse ${1.2+i*0.25}s infinite`}}>⟳ {s}</span>
         ))}
       </div>
     </div>
@@ -656,116 +521,87 @@ function DNALoader() {
 function Accordion({ title, icon, children, defaultOpen=false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ border:"1px solid rgba(255,255,255,0.07)", borderRadius:11, overflow:"hidden", marginBottom:7 }}>
-      <button onClick={() => setOpen(!open)} style={{
-        width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
-        padding:"12px 16px", background: open?"rgba(0,207,193,0.08)":"rgba(255,255,255,0.025)",
-        border:"none", cursor:"pointer", color:"#d4dbe8", transition:"all 0.18s"
-      }}>
-        <span style={{ display:"flex", alignItems:"center", gap:9, fontWeight:600, fontSize:13 }}>
-          <span style={{ fontSize:16 }}>{icon}</span>{title}
-        </span>
-        <span style={{ fontSize:16, transition:"transform 0.3s", transform:open?"rotate(180deg)":"rotate(0)" }}>⌄</span>
+    <div style={{border:"1.5px solid rgba(11,94,215,0.1)",borderRadius:11,overflow:"hidden",marginBottom:7}}>
+      <button onClick={()=>setOpen(!open)} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",background:open?"rgba(11,94,215,0.06)":"rgba(11,94,215,0.02)",border:"none",cursor:"pointer",color:"#212529",transition:"all 0.18s"}}>
+        <span style={{display:"flex",alignItems:"center",gap:9,fontWeight:600,fontSize:13}}><span style={{fontSize:16}}>{icon}</span>{title}</span>
+        <span style={{fontSize:16,transition:"transform 0.3s",transform:open?"rotate(180deg)":"rotate(0)"}}>⌄</span>
       </button>
       <div className={`accordion-content ${open?"open":""}`}>
-        <div style={{ padding:"14px 16px", background:"rgba(0,0,0,0.2)" }}>{children}</div>
+        <div style={{padding:"14px 16px",background:"rgba(11,94,215,0.02)"}}>{children}</div>
       </div>
     </div>
   );
 }
 
 function InfoModal({ drug, data, onClose }) {
-  const cfg = RISK_CONFIG[data.risk] || RISK_CONFIG.Unknown;
-  const sevCfg = SEVERITY_CONFIG[data.severity] || SEVERITY_CONFIG.none;
+  const cfg=RISK_CONFIG[data.risk]||RISK_CONFIG.Unknown;
+  const sevCfg=SEVERITY_CONFIG[data.severity]||SEVERITY_CONFIG.none;
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()}>
-        <div style={{ padding:"22px 24px 0" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ width:48, height:48, borderRadius:12, background:cfg.bg, border:`1px solid ${cfg.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>
-                {cfg.icon}
-              </div>
+      <div className="modal-box" onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"22px 24px 0"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:48,height:48,borderRadius:12,background:cfg.bg,border:`1px solid ${cfg.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{cfg.icon}</div>
               <div>
-                <div className="fraunces" style={{ fontSize:22, fontWeight:800, color:"#d4dbe8" }}>{drug}</div>
-                <span className="pg-badge" style={{ background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}`, marginTop:4 }}>{cfg.label}</span>
+                <div className="fraunces" style={{fontSize:22,fontWeight:800,color:"#212529"}}>{drug}</div>
+                <span className="pg-badge" style={{background:cfg.bg,color:cfg.color,border:`1px solid ${cfg.border}`,marginTop:4}}>{cfg.label}</span>
               </div>
             </div>
-            <button className="pg-btn pg-btn-ghost" onClick={onClose} style={{ padding:"5px 10px" }}>✕</button>
+            <button className="pg-btn pg-btn-ghost" onClick={onClose} style={{padding:"5px 10px"}}>✕</button>
           </div>
-
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:18 }}>
-            {[{l:"Gene",v:data.gene},{l:"Diplotype",v:data.diplotype},{l:"Phenotype",v:data.phenotypeLabel},{l:"CPIC Level",v:data.cpic}].map(f => (
-              <div key={f.l} style={{ background:"rgba(255,255,255,0.04)", borderRadius:9, padding:"10px 13px", border:"1px solid rgba(255,255,255,0.07)" }}>
-                <div style={{ fontSize:10, color:"#64748b", letterSpacing:1.2, marginBottom:4, fontWeight:600 }}>{f.l.toUpperCase()}</div>
-                <div className="mono" style={{ fontSize:12, color:"#d4dbe8", fontWeight:500 }}>{f.v}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
+            {[{l:"Gene",v:data.gene},{l:"Diplotype",v:data.diplotype},{l:"Phenotype",v:data.phenotypeLabel},{l:"CPIC Level",v:data.cpic}].map(f=>(
+              <div key={f.l} style={{background:"rgba(11,94,215,0.04)",borderRadius:9,padding:"10px 13px",border:"1px solid rgba(11,94,215,0.08)"}}>
+                <div style={{fontSize:10,color:"#6c757d",letterSpacing:1.2,marginBottom:4,fontWeight:600}}>{f.l.toUpperCase()}</div>
+                <div className="mono" style={{fontSize:12,color:"#212529",fontWeight:500}}>{f.v}</div>
               </div>
             ))}
           </div>
         </div>
-
-        <div style={{ padding:"0 24px 22px", display:"flex", flexDirection:"column", gap:12 }}>
-          <div style={{ background:"rgba(255,255,255,0.03)", borderRadius:11, padding:"14px 16px", border:`1px solid ${cfg.border}40` }}>
-            <div style={{ fontSize:11, color:"#64748b", letterSpacing:1.2, marginBottom:8, fontWeight:600 }}>⚠ WHY IS THIS {data.risk.toUpperCase()}?</div>
-            <div style={{ fontSize:13, color:"#d4dbe8", lineHeight:1.75 }}>{data.whyRisk}</div>
+        <div style={{padding:"0 24px 22px",display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{background:cfg.bg,borderRadius:11,padding:"14px 16px",border:`1px solid ${cfg.border}`}}>
+            <div style={{fontSize:11,color:"#6c757d",letterSpacing:1.2,marginBottom:8,fontWeight:600}}>⚠ WHY IS THIS {data.risk.toUpperCase()}?</div>
+            <div style={{fontSize:13,color:"#212529",lineHeight:1.75}}>{data.whyRisk}</div>
           </div>
-
-          <div style={{ background:"rgba(0,0,0,0.25)", borderRadius:11, padding:"14px 16px" }}>
-            <div style={{ fontSize:11, color:"#64748b", letterSpacing:1.2, marginBottom:8, fontWeight:600 }}>🔬 PHARMACOGENOMIC MECHANISM</div>
-            <div style={{ fontSize:13, color:"#94a3b8", lineHeight:1.75 }}>{data.mechanism}</div>
+          <div style={{background:"rgba(11,94,215,0.03)",borderRadius:11,padding:"14px 16px",border:"1.5px solid rgba(11,94,215,0.08)"}}>
+            <div style={{fontSize:11,color:"#6c757d",letterSpacing:1.2,marginBottom:8,fontWeight:600}}>🔬 PHARMACOGENOMIC MECHANISM</div>
+            <div style={{fontSize:13,color:"#495057",lineHeight:1.75}}>{data.mechanism}</div>
           </div>
-
-          <div style={{ background:"rgba(0,207,193,0.07)", borderRadius:11, padding:"14px 16px", border:"1px solid rgba(0,207,193,0.15)" }}>
-            <div style={{ fontSize:11, color:"#64748b", letterSpacing:1.2, marginBottom:8, fontWeight:600 }}>💊 CLINICAL RECOMMENDATION</div>
-            <div style={{ fontSize:13, color:"#4de8db", marginBottom:6, lineHeight:1.7 }}><strong>Dosage:</strong> {data.dosage}</div>
-            <div style={{ fontSize:13, color:"#00CFC1", lineHeight:1.7 }}><strong>Alternative:</strong> {data.alternative}</div>
+          <div style={{background:"rgba(32,201,151,0.06)",borderRadius:11,padding:"14px 16px",border:"1px solid rgba(32,201,151,0.2)"}}>
+            <div style={{fontSize:11,color:"#6c757d",letterSpacing:1.2,marginBottom:8,fontWeight:600}}>💊 CLINICAL RECOMMENDATION</div>
+            <div style={{fontSize:13,color:"#155a44",marginBottom:6,lineHeight:1.7}}><strong>Dosage:</strong> {data.dosage}</div>
+            <div style={{fontSize:13,color:"#20C997",lineHeight:1.7}}><strong>Alternative:</strong> {data.alternative}</div>
           </div>
-
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ fontSize:11, color:"#64748b" }}>Severity:</div>
-            <span className="pg-badge" style={{ background:`${sevCfg.color}15`, color:sevCfg.color, border:`1px solid ${sevCfg.color}30` }}>
-              {sevCfg.label.toUpperCase()}
-            </span>
-            <div style={{ fontSize:11, color:"#64748b", marginLeft:10 }}>Confidence:</div>
-            <span className="mono" style={{ fontSize:12, color:cfg.color, fontWeight:600 }}>
-              {Math.round((data.confidence || 0) * 100)}%
-            </span>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{fontSize:11,color:"#6c757d"}}>Severity:</div>
+            <span className="pg-badge" style={{background:`${sevCfg.color}12`,color:sevCfg.color,border:`1px solid ${sevCfg.color}30`}}>{sevCfg.label.toUpperCase()}</span>
+            <div style={{fontSize:11,color:"#6c757d",marginLeft:10}}>Confidence:</div>
+            <span className="mono" style={{fontSize:12,color:cfg.color,fontWeight:600}}>{Math.round((data.confidence||0)*100)}%</span>
           </div>
-
-          {data.variants && data.variants.length > 0 && (
+          {data.variants?.length > 0 && (
             <div>
-              <div style={{ fontSize:11, color:"#64748b", letterSpacing:1.2, marginBottom:8, fontWeight:600 }}>🧬 DETECTED VARIANTS</div>
-              <div style={{ overflowX:"auto" }}>
-                <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
-                  <thead><tr style={{ borderBottom:"1px solid rgba(255,255,255,0.07)" }}>
-                    {["rsID","Change","Impact","Consequence"].map(h => (
-                      <th key={h} style={{ padding:"6px 10px", textAlign:"left", color:"#64748b", fontWeight:600, fontSize:10, letterSpacing:1 }}>{h}</th>
-                    ))}
-                  </tr></thead>
-                  <tbody>
-                    {data.variants.map((v,i) => (
-                      <tr key={i} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
-                        <td className="mono" style={{ padding:"7px 10px", color:"#4de8db", fontSize:11 }}>{v.rsid || v.id}</td>
-                        <td className="mono" style={{ padding:"7px 10px", color:"#d4dbe8", fontSize:11 }}>{v.allele}</td>
-                        <td style={{ padding:"7px 10px" }}>
-                          <span className="pg-badge" style={{ background:v.impact==="HIGH"?"rgba(240,84,68,0.13)":"rgba(245,158,11,0.13)", color:v.impact==="HIGH"?"#F05444":"#f59e0b", border:`1px solid ${v.impact==="HIGH"?"rgba(240,84,68,0.25)":"rgba(245,158,11,0.25)"}`, fontSize:10 }}>
-                            {v.impact}
-                          </span>
-                        </td>
-                        <td style={{ padding:"7px 10px", color:"#94a3b8", fontSize:11, maxWidth:180 }}>{v.consequence}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <div style={{fontSize:11,color:"#6c757d",letterSpacing:1.2,marginBottom:8,fontWeight:600}}>🧬 DETECTED VARIANTS</div>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead><tr style={{borderBottom:"1.5px solid rgba(11,94,215,0.1)"}}>
+                  {["rsID","Change","Impact","Consequence"].map(h=><th key={h} style={{padding:"6px 10px",textAlign:"left",color:"#6c757d",fontWeight:600,fontSize:10,letterSpacing:1}}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {data.variants.map((v,i)=>(
+                    <tr key={i} style={{borderBottom:"1px solid rgba(11,94,215,0.06)"}}>
+                      <td className="mono" style={{padding:"7px 10px",color:"#0B5ED7",fontSize:11}}>{v.rsid||v.id}</td>
+                      <td className="mono" style={{padding:"7px 10px",color:"#212529",fontSize:11}}>{v.allele}</td>
+                      <td style={{padding:"7px 10px"}}><span className="pg-badge" style={{background:v.impact==="HIGH"?"rgba(239,68,68,0.1)":"rgba(245,158,11,0.1)",color:v.impact==="HIGH"?"#ef4444":"#f59e0b",border:`1px solid ${v.impact==="HIGH"?"rgba(239,68,68,0.25)":"rgba(245,158,11,0.25)"}`,fontSize:10}}>{v.impact}</span></td>
+                      <td style={{padding:"7px 10px",color:"#6c757d",fontSize:11,maxWidth:180}}>{v.consequence}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-
-          {data.references && data.references.length > 0 && (
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              {data.references.map((ref,i) => (
-                <span key={i} className="pg-badge mono" style={{ background:"rgba(255,255,255,0.05)", color:"#64748b", border:"1px solid rgba(255,255,255,0.08)", fontSize:10 }}>{ref}</span>
-              ))}
+          {data.references?.length > 0 && (
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {data.references.map((ref,i)=><span key={i} className="pg-badge mono" style={{background:"rgba(11,94,215,0.06)",color:"#6c757d",border:"1px solid rgba(11,94,215,0.12)",fontSize:10}}>{ref}</span>)}
             </div>
           )}
         </div>
@@ -774,65 +610,119 @@ function InfoModal({ drug, data, onClose }) {
   );
 }
 
-function RiskCard({ drug, data, delay = 0 }) {
+function RiskCard({ drug, data, delay=0 }) {
   const [modalOpen, setModalOpen] = useState(false);
-  const cfg = RISK_CONFIG[data.risk] || RISK_CONFIG.Unknown;
-  const confidence = Math.round((data.confidence || 0) * 100);
+  const cfg=RISK_CONFIG[data.risk]||RISK_CONFIG.Unknown;
+  const confidence=Math.round((data.confidence||0)*100);
   return (
     <>
-      <div className="pg-card risk-card-enter" style={{ border:`1px solid ${cfg.border}`, background:cfg.bg, animationDelay:`${delay}s`, position:"relative" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
+      <div className="pg-card risk-card-enter" style={{border:`1.5px solid ${cfg.border}`,background:cfg.bg,animationDelay:`${delay}s`,position:"relative"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
           <div>
-            <div style={{ fontSize:10, color:"#64748b", fontWeight:700, letterSpacing:2, marginBottom:4 }}>DRUG</div>
-            <div className="fraunces" style={{ fontSize:19, fontWeight:800, color:"#d4dbe8" }}>{drug}</div>
-            <div style={{ fontSize:10, color:"#64748b", marginTop:2 }}>{data.category || "Medication"}</div>
+            <div style={{fontSize:10,color:"#6c757d",fontWeight:700,letterSpacing:2,marginBottom:4}}>DRUG</div>
+            <div className="fraunces" style={{fontSize:19,fontWeight:800,color:"#212529"}}>{drug}</div>
+            <div style={{fontSize:10,color:"#6c757d",marginTop:2}}>{data.category||"Medication"}</div>
           </div>
-          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
-            <button className="info-btn" onClick={() => setModalOpen(true)} title="Why this risk?">ℹ</button>
-            <div style={{ fontSize:24 }}>{cfg.icon}</div>
-            <span className="pg-badge" style={{ background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}` }}>{cfg.label}</span>
-          </div>
-        </div>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-          <CircularProgress value={confidence} size={68} color={cfg.color} label="CONFIDENCE" />
-          <div style={{ flex:1, paddingLeft:14 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, marginBottom:6 }}>
-              <span style={{ color:"#64748b" }}>Gene</span>
-              <span className="mono" style={{ color:"#4de8db", fontSize:11 }}>{data.gene}</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, marginBottom:6 }}>
-              <span style={{ color:"#64748b" }}>Phenotype</span>
-              <span style={{ color:"#d4dbe8", fontSize:11, textAlign:"right", maxWidth:130 }}>{data.phenotypeLabel || data.phenotype}</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:12 }}>
-              <span style={{ color:"#64748b" }}>CPIC</span>
-              <span className="mono" style={{ color:"#00CFC1", fontSize:11 }}>{data.cpic}</span>
-            </div>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+            <button className="info-btn" onClick={()=>setModalOpen(true)}>ℹ</button>
+            <div style={{fontSize:24}}>{cfg.icon}</div>
+            <span className="pg-badge" style={{background:cfg.bg,color:cfg.color,border:`1px solid ${cfg.border}`}}>{cfg.label}</span>
           </div>
         </div>
-        <div style={{ marginBottom:12 }}>
-          <div style={{ fontSize:10, color:"#64748b", marginBottom:5, letterSpacing:1, fontWeight:600 }}>GENE IMPACT</div>
-          <MiniBarChart value={data.geneImpact} color={cfg.color} label="" />
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <CircularProgress value={confidence} size={68} color={cfg.color} label="CONFIDENCE"/>
+          <div style={{flex:1,paddingLeft:14}}>
+            {[{l:"Gene",v:data.gene,col:"#0B5ED7"},{l:"Phenotype",v:data.phenotypeLabel||data.phenotype,col:"#212529"},{l:"CPIC",v:data.cpic,col:"#20C997"}].map(f=>(
+              <div key={f.l} style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:6}}>
+                <span style={{color:"#6c757d"}}>{f.l}</span>
+                <span className="mono" style={{color:f.col,fontSize:11,textAlign:"right",maxWidth:130}}>{f.v}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <div style={{ padding:"9px 12px", background:"rgba(0,0,0,0.3)", borderRadius:9, fontSize:12, color:"#94a3b8", lineHeight:1.5 }}>
-          💊 <strong style={{ color:"#d4dbe8" }}>Alt:</strong> {data.alternative}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:10,color:"#6c757d",marginBottom:5,letterSpacing:1,fontWeight:600}}>GENE IMPACT</div>
+          <MiniBarChart value={data.geneImpact} color={cfg.color} label=""/>
         </div>
-        <button onClick={() => setModalOpen(true)} style={{
-          marginTop:10, width:"100%", padding:"8px", background:`${cfg.color}15`, border:`1px solid ${cfg.border}`,
-          borderRadius:8, cursor:"pointer", color:cfg.color, fontSize:12, fontWeight:600, fontFamily:"DM Sans,sans-serif",
-          transition:"all 0.18s", display:"flex", alignItems:"center", justifyContent:"center", gap:6
-        }}>
+        <div style={{padding:"9px 12px",background:"rgba(11,94,215,0.04)",border:"1px solid rgba(11,94,215,0.08)",borderRadius:9,fontSize:12,color:"#495057",lineHeight:1.5}}>
+          💊 <strong style={{color:"#212529"}}>Alt:</strong> {data.alternative}
+        </div>
+        <button onClick={()=>setModalOpen(true)} style={{marginTop:10,width:"100%",padding:"8px",background:`${cfg.color}12`,border:`1.5px solid ${cfg.border}`,borderRadius:8,cursor:"pointer",color:cfg.color,fontSize:12,fontWeight:600,fontFamily:"DM Sans,sans-serif",transition:"all 0.18s",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           ℹ Why {cfg.label}? →
         </button>
       </div>
-      {modalOpen && <InfoModal drug={drug} data={data} onClose={() => setModalOpen(false)} />}
+      {modalOpen && <InfoModal drug={drug} data={data} onClose={()=>setModalOpen(false)}/>}
     </>
+  );
+}
+
+function DetailCard({ drug, data, cfg }) {
+  const [infoOpen, setInfoOpen] = useState(false);
+  return (
+    <div className="pg-card" style={{border:`1px solid ${cfg.border}`}}>
+      {infoOpen && <InfoModal drug={drug} data={data} onClose={()=>setInfoOpen(false)}/>}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <span style={{fontSize:24}}>{cfg.icon}</span>
+        <div style={{flex:1}}>
+          <div className="fraunces" style={{fontSize:18,fontWeight:800,color:"#212529"}}>{drug}</div>
+          <span className="pg-badge" style={{background:cfg.bg,color:cfg.color,border:`1px solid ${cfg.border}`,fontSize:11}}>{cfg.label}</span>
+          <span style={{marginLeft:6,fontSize:11,color:"#6c757d"}}>{data.category}</span>
+        </div>
+        <button className="info-btn" onClick={()=>setInfoOpen(true)} style={{width:32,height:32,fontSize:14}}>ℹ</button>
+        <CircularProgress value={Math.round((data.confidence||0)*100)} size={62} color={cfg.color} label="CONF."/>
+      </div>
+      <Accordion title="Pharmacogenomic Profile" icon="🧬" defaultOpen>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:14}}>
+          {[{l:"Gene",v:data.gene},{l:"Diplotype",v:data.diplotype},{l:"Phenotype",v:data.phenotypeLabel||data.phenotype},{l:"CPIC Level",v:data.cpic}].map(f=>(
+            <div key={f.l} style={{background:"rgba(11,94,215,0.04)",borderRadius:9,padding:"9px 12px",border:"1px solid rgba(11,94,215,0.08)"}}>
+              <div style={{fontSize:10,color:"#6c757d",letterSpacing:1.2,marginBottom:4,fontWeight:600}}>{f.l.toUpperCase()}</div>
+              <div className="mono" style={{fontSize:11,color:"#212529"}}>{f.v}</div>
+            </div>
+          ))}
+        </div>
+        {data.variants?.length > 0 && (
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead><tr style={{borderBottom:"1.5px solid rgba(11,94,215,0.1)"}}>
+              {["rsID","Allele","Impact","Consequence"].map(h=><th key={h} style={{padding:"6px 10px",textAlign:"left",color:"#6c757d",fontWeight:600,fontSize:10}}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {data.variants.map((v,i)=>(
+                <tr key={i} style={{borderBottom:"1px solid rgba(11,94,215,0.06)"}}>
+                  <td className="mono" style={{padding:"6px 10px",color:"#0B5ED7",fontSize:11}}>{v.rsid||v.id}</td>
+                  <td className="mono" style={{padding:"6px 10px",color:"#212529"}}>{v.allele}</td>
+                  <td style={{padding:"6px 10px"}}><span className="pg-badge" style={{background:v.impact==="HIGH"?"rgba(239,68,68,0.1)":"rgba(245,158,11,0.1)",color:v.impact==="HIGH"?"#ef4444":"#f59e0b",fontSize:10}}>{v.impact}</span></td>
+                  <td style={{padding:"6px 10px",color:"#6c757d",fontSize:11}}>{v.consequence}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Accordion>
+      <Accordion title="Clinical Recommendation" icon="💊">
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {[{l:"Dosage Guidance",v:data.dosage,col:"#f59e0b"},{l:"Alternative Drug",v:data.alternative,col:"#20C997"},{l:"CPIC Guideline",v:data.cpic,col:"#0B5ED7"}].map(f=>(
+            <div key={f.l} style={{display:"flex",gap:10,padding:"9px 12px",background:"rgba(11,94,215,0.03)",borderRadius:9}}>
+              <div style={{fontSize:11,color:"#6c757d",minWidth:120,fontWeight:500}}>{f.l}</div>
+              <div style={{fontSize:12,color:f.col,fontWeight:600,lineHeight:1.5}}>{f.v}</div>
+            </div>
+          ))}
+        </div>
+      </Accordion>
+      <Accordion title="Mechanism & Risk Explanation" icon="🔬">
+        <div style={{fontSize:13,color:"#495057",lineHeight:1.8,background:"rgba(11,94,215,0.03)",padding:14,borderRadius:9,marginBottom:10,border:"1.5px solid rgba(11,94,215,0.08)"}}>{data.mechanism}</div>
+        <div style={{fontSize:13,color:"#212529",lineHeight:1.8,background:cfg.bg,padding:14,borderRadius:9,border:`1px solid ${cfg.border}`}}>
+          <strong style={{color:cfg.color}}>⚠ Why {data.risk}?</strong><br/>{data.whyRisk}
+        </div>
+        <div style={{marginTop:12}}><MiniBarChart value={data.geneImpact} color={cfg.color} label={data.gene}/></div>
+      </Accordion>
+    </div>
   );
 }
 
 // ─── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function PharmaGuard() {
   useEffect(() => { injectStyles(); }, []);
+  const navigate = useNavigate();
 
   const [page, setPage] = useState("main");
   const [file, setFile] = useState(null);
@@ -852,8 +742,24 @@ export default function PharmaGuard() {
   const fileInputRef = useRef(null);
   const drugInputRef = useRef(null);
 
-  const handleDrugSearch = (e) => {
-    setDrugSearch(e.target.value);
+  const NAV_ITEMS = [
+    { label:"Dashboard",       key:"main",       path:"/analysis",       dot:false, internal:true  },
+    { label:"👨‍👩‍👧‍👦 Family",   key:"family",     path:"/family-section", dot:true,  internal:false },
+    { label:"Book Technician", key:"technician", path:"/technician",     dot:false, internal:false },
+    { label:"History",         key:"history",    path:"/history",        dot:false, internal:true  },
+    { label:"About",           key:"about",      path:"/about",          dot:false, internal:true  },
+    { label:"Profile",         key:"profile",    path:"/profile",        dot:false, internal:false },
+  ];
+
+  const isNavActive = (item) =>
+    (item.key === "main" && page === "main") ||
+    (item.key === "history" && page === "history") ||
+    (item.key === "about" && page === "about");
+
+  const handleNavClick = (item) => {
+    setMobileMenu(false);
+    if (item.internal) { setPage(item.key); }
+    else { navigate(item.path); }
   };
 
   const filteredDrugs = useMemo(() => {
@@ -862,41 +768,37 @@ export default function PharmaGuard() {
     return ALL_DRUGS.filter(d => d.includes(q) && !selectedDrugs.includes(d));
   }, [drugSearch, selectedDrugs]);
 
+  // ── Local VCF upload — no backend ────────────────────────────────────────────
   const handleFile = async (f) => {
     if (!f) return;
-    setFile(f);
-    setFileStatus("validating");
-    setResults(null);
-    setSelectedDrugs([]);
+    setFile(f); setFileStatus("validating"); setResults(null); setSelectedDrugs([]);
     try {
-      if (!f.name.endsWith(".vcf") && !f.name.endsWith(".vcf.gz")) throw new Error("Invalid format: must be a .vcf file");
-      if (f.size > 5 * 1024 * 1024) throw new Error("File too large: maximum 5MB allowed");
+      if (!f.name.endsWith(".vcf") && !f.name.endsWith(".vcf.gz"))
+        throw new Error("Invalid format: must be a .vcf file");
+      if (f.size > 5 * 1024 * 1024)
+        throw new Error("File too large: maximum 5MB allowed");
       const info = await parseVCF(f);
       setFileInfo(info);
       setFileStatus("valid");
       showNotif(`✓ VCF validated — ${info.variants} variants, ${info.pgxGenes.length} PGx genes detected`, "success");
     } catch (e) {
-      setFileStatus("error");
-      setFileError(e.message);
+      setFileStatus("error"); setFileError(e.message);
       showNotif(e.message, "error");
     }
   };
 
   const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    setDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
+    e.preventDefault(); setDragging(false);
+    const f = e.dataTransfer.files[0]; if (f) handleFile(f);
   }, []);
 
+  // ── Local analysis — no backend ───────────────────────────────────────────────
   const doAnalysis = async () => {
     if (!fileInfo || selectedDrugs.length === 0) return;
-    setAnalyzing(true);
-    setResults(null);
+    setAnalyzing(true); setResults(null);
     try {
       const r = await runAnalysis(fileInfo, selectedDrugs);
-      setResults(r);
-      setActiveTab("cards");
+      setResults(r); setActiveTab("cards");
       setTimeout(() => document.getElementById("results-section")?.scrollIntoView({ behavior:"smooth" }), 100);
     } catch(e) {
       showNotif("Analysis failed — please retry", "error");
@@ -906,223 +808,172 @@ export default function PharmaGuard() {
   };
 
   const clinicalJSON = useMemo(() => results ? buildClinicalJSON(results, fileInfo) : null, [results, fileInfo]);
-
-  const copyJSON = () => {
-    navigator.clipboard.writeText(JSON.stringify(clinicalJSON, null, 2));
-    showNotif("Clinical JSON copied to clipboard", "success");
-  };
-
+  const copyJSON    = () => { navigator.clipboard.writeText(JSON.stringify(clinicalJSON, null, 2)); showNotif("JSON copied", "success"); };
   const downloadJSON = () => {
-    const blob = new Blob([JSON.stringify(clinicalJSON, null, 2)], { type:"application/json" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `pharmaguard_report_${results?.sampleId}_${new Date().toISOString().split("T")[0]}.json`;
-    a.click();
-    showNotif("Clinical JSON report downloaded", "success");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(clinicalJSON, null, 2)], { type:"application/json" }));
+    a.download = `pharmaguard_${results?.sampleId}_${new Date().toISOString().split("T")[0]}.json`;
+    a.click(); showNotif("JSON downloaded", "success");
   };
-
   const downloadCSV = () => {
     if (!results) return;
-    const headers = ["Drug","Risk Label","Severity","Confidence","Gene","Diplotype","Phenotype","CPIC Level","Dosage Guidance","Alternative","Variants Detected"];
-    const rows = Object.entries(results.drugs).map(([drug, data]) => [
-      drug, data.risk, data.severity || "none",
-      Math.round((data.confidence || 0) * 100) + "%",
-      data.gene, data.diplotype || "N/A", data.phenotypeLabel || data.phenotype || "N/A",
-      data.cpic || "N/A", `"${data.dosage || "N/A"}"`, `"${data.alternative || "N/A"}"`,
-      (data.variants || []).length
-    ]);
-    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type:"text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `pharmaguard_${results.sampleId}_${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    showNotif("CSV report downloaded", "success");
+    const h = ["Drug","Risk","Severity","Confidence","Gene","Diplotype","Phenotype","CPIC","Dosage","Alternative","Variants"];
+    const rows = Object.entries(results.drugs).map(([d,v]) => [d, v.risk, v.severity||"none", Math.round((v.confidence||0)*100)+"%", v.gene, v.diplotype||"N/A", v.phenotypeLabel||v.phenotype||"N/A", v.cpic||"N/A", `"${v.dosage||"N/A"}"`, `"${v.alternative||"N/A"}"`, (v.variants||[]).length]);
+    const blob = new Blob([[h,...rows].map(r=>r.join(",")).join("\n")], { type:"text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `pharmaguard_${results.sampleId}.csv`; a.click();
+    showNotif("CSV downloaded", "success");
   };
-
   const downloadClinicalPDF = async () => {
-    setExportingPDF(true);
-    showNotif("Generating clinical PDF report...", "info");
-    await new Promise(r => setTimeout(r, 2000));
-    const htmlContent = `<!DOCTYPE html>
-<html><head>
-<meta charset="UTF-8">
-<title>PharmaGuard Clinical Report — ${results?.sampleId}</title>
-<style>
-  body{font-family:Arial,sans-serif;color:#1a1a2e;max-width:900px;margin:0 auto;padding:40px;font-size:12px;}
-  h1{font-size:24px;color:#0F5F73;border-bottom:3px solid #0F5F73;padding-bottom:10px;margin-bottom:20px;}
-  h2{font-size:16px;color:#0F5F73;margin:20px 0 8px;}
-  h3{font-size:13px;color:#0a3540;margin:14px 0 6px;}
-  .header-meta{display:flex;justify-content:space-between;margin-bottom:20px;padding:15px;background:#f0f9ff;border-radius:8px;border-left:4px solid #0F5F73;}
-  .drug-section{border:1px solid #cbd5e1;border-radius:8px;padding:16px;margin:14px 0;page-break-inside:avoid;}
-  .risk-toxic{border-left:5px solid #F05444;background:#fef2f2;}
-  .risk-adjust{border-left:5px solid #f59e0b;background:#fffbeb;}
-  .risk-ineffective{border-left:5px solid #F05444;background:#fff7ed;}
-  .risk-safe{border-left:5px solid #22c55e;background:#f0fdf4;}
-  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;}
-  .badge-toxic{background:#fee2e2;color:#8B2F2F;}
-  .badge-adjust{background:#fef3c7;color:#92400e;}
-  .badge-safe{background:#dcfce7;color:#166534;}
-  .badge-ineffective{background:#ffedd5;color:#9a3412;}
-  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:11px;}
-  th{background:#e0f2fe;color:#0c4a6e;padding:6px 8px;text-align:left;border:1px solid #bae6fd;}
-  td{padding:5px 8px;border:1px solid #e2e8f0;}
-  .disclaimer{margin-top:30px;padding:15px;background:#fefce8;border:1px solid #fbbf24;border-radius:8px;font-size:10px;color:#78350f;}
-  .footer{text-align:center;margin-top:20px;color:#94a3b8;font-size:10px;border-top:1px solid #e2e8f0;padding-top:12px;}
-</style></head><body>
-<h1>🧬 PharmaGuard — Pharmacogenomic Clinical Report</h1>
-<div class="header-meta">
-  <div><strong>Patient/Sample ID:</strong> ${results?.sampleId}<br><strong>Analysis Date:</strong> ${new Date(results?.analyzedAt).toLocaleString()}<br><strong>VCF Variants:</strong> ${fileInfo?.variants || "N/A"}</div>
-  <div><strong>PGx Genes:</strong> ${(fileInfo?.pgxGenes || []).join(", ") || "N/A"}<br><strong>VCF Quality:</strong> ${fileInfo?.quality || "N/A"}%<br><strong>Guideline:</strong> CPIC 2024</div>
-</div>
-<h2>Clinical Summary</h2>
-<table><tr><th>Risk Category</th><th>Drugs</th><th>Count</th></tr>
-  <tr><td><span class="badge badge-toxic">☠️ Toxic</span></td><td>${results?.summary?.highRisk?.join(", ") || "None"}</td><td>${results?.summary?.highRisk?.length || 0}</td></tr>
-  <tr><td><span class="badge badge-adjust">⚖️ Adjust Dosage</span></td><td>${results?.summary?.adjustDosage?.join(", ") || "None"}</td><td>${results?.summary?.adjustDosage?.length || 0}</td></tr>
-  <tr><td><span class="badge badge-ineffective">🚫 Ineffective</span></td><td>${results?.summary?.ineffective?.join(", ") || "None"}</td><td>${results?.summary?.ineffective?.length || 0}</td></tr>
-  <tr><td><span class="badge badge-safe">🛡️ Safe</span></td><td>${results?.summary?.safe?.join(", ") || "None"}</td><td>${results?.summary?.safe?.length || 0}</td></tr>
-</table>
-${results?.alert ? `<div style="padding:12px;background:#fef2f2;border:1px solid #F05444;border-radius:6px;color:#8B2F2F;margin:12px 0;"><strong>⚠ CLINICAL ALERT:</strong> ${results.alert}</div>` : ""}
-<h2>Individual Drug Analyses</h2>
-${Object.entries(results?.drugs || {}).map(([drug, data]) => `
-<div class="drug-section risk-${(data.risk||"").toLowerCase().replace(" ","")}">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-    <div><h3 style="margin:0;font-size:16px;">${drug}</h3><span class="badge badge-${(data.risk||"").toLowerCase().replace(" ","")}">${data.risk}</span> — ${data.category || "Medication"}</div>
-    <div style="text-align:right;"><strong>Confidence:</strong> ${Math.round((data.confidence||0)*100)}%<br><strong>CPIC:</strong> ${data.cpic}</div>
-  </div>
-  <table style="margin-top:10px;">
-    <tr><th>Gene</th><th>Diplotype</th><th>Phenotype</th><th>Severity</th></tr>
-    <tr><td>${data.gene}</td><td>${data.diplotype || "N/A"}</td><td>${data.phenotypeLabel || data.phenotype || "N/A"}</td><td>${data.severity || "N/A"}</td></tr>
-  </table>
-  <p><strong>Dosage Guidance:</strong> ${data.dosage}</p>
-  <p><strong>Alternative:</strong> ${data.alternative}</p>
-  <p style="color:#374151;font-size:11px;">${data.mechanism}</p>
-  ${(data.variants||[]).length > 0 ? `<table><tr><th>rsID</th><th>Allele Change</th><th>Impact</th><th>Consequence</th></tr>
-  ${(data.variants||[]).map(v=>`<tr><td>${v.rsid||v.id}</td><td>${v.allele}</td><td>${v.impact}</td><td>${v.consequence||"N/A"}</td></tr>`).join("")}
-  </table>` : ""}
-</div>`).join("")}
-<div class="disclaimer">
-  <strong>⚕️ Medical Use Limitation Notice</strong><br>
-  The pharmacogenomic predictions generated by this system are based on detected genetic variants and current guideline-based interpretations. This tool is intended for clinical decision support and research use only and must not replace professional medical judgment.
-</div>
-<div class="footer">PharmaGuard v3.0 · CPIC Guidelines 2024 · Generated ${new Date().toLocaleString()} · For Research & Clinical Decision Support Only</div>
-</body></html>`;
+    setExportingPDF(true); showNotif("Generating PDF...", "info");
+    await new Promise(r => setTimeout(r, 1500));
     const w = window.open("","_blank");
     if (w) {
-      w.document.write(htmlContent);
+      w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>PharmaGuard Report</title>
+      <style>body{font-family:Arial;max-width:900px;margin:0 auto;padding:40px;font-size:12px;}h1{color:#0B5ED7;border-bottom:3px solid #0B5ED7;padding-bottom:10px;}h2{color:#0B5ED7;margin:20px 0 8px;}table{width:100%;border-collapse:collapse;margin:10px 0;}th{background:#dbeafe;padding:6px 8px;text-align:left;border:1px solid #93c5fd;}td{padding:5px 8px;border:1px solid #e2e8f0;}.disclaimer{margin-top:30px;padding:15px;background:#fefce8;border:1px solid #fbbf24;font-size:10px;color:#78350f;}</style>
+      </head><body><h1>🧬 PharmaGuard — Clinical Report</h1>
+      <p><strong>Patient:</strong> ${results?.sampleId} | <strong>Date:</strong> ${new Date(results?.analyzedAt).toLocaleString()} | <strong>Variants:</strong> ${fileInfo?.variants||"N/A"} | <strong>Guideline:</strong> CPIC 2024</p>
+      <h2>Summary</h2>
+      <table><tr><th>Risk</th><th>Drugs</th><th>Count</th></tr>
+      <tr><td>☠️ Toxic</td><td>${results?.summary?.highRisk?.join(", ")||"None"}</td><td>${results?.summary?.highRisk?.length||0}</td></tr>
+      <tr><td>⚖️ Adjust Dose</td><td>${results?.summary?.adjustDosage?.join(", ")||"None"}</td><td>${results?.summary?.adjustDosage?.length||0}</td></tr>
+      <tr><td>🚫 Ineffective</td><td>${results?.summary?.ineffective?.join(", ")||"None"}</td><td>${results?.summary?.ineffective?.length||0}</td></tr>
+      <tr><td>🛡️ Safe</td><td>${results?.summary?.safe?.join(", ")||"None"}</td><td>${results?.summary?.safe?.length||0}</td></tr></table>
+      <h2>Drug Details</h2>
+      ${Object.entries(results?.drugs||{}).map(([drug,d])=>`<div style="border:1px solid #cbd5e1;padding:14px;margin:12px 0;border-radius:6px;"><h3 style="margin:0 0 8px">${drug} — ${d.risk}</h3><table><tr><th>Gene</th><th>Diplotype</th><th>Phenotype</th><th>Confidence</th><th>CPIC</th></tr><tr><td>${d.gene}</td><td>${d.diplotype||"N/A"}</td><td>${d.phenotypeLabel||d.phenotype||"N/A"}</td><td>${Math.round((d.confidence||0)*100)}%</td><td>${d.cpic}</td></tr></table><p><strong>Dosage:</strong> ${d.dosage}</p><p><strong>Alternative:</strong> ${d.alternative}</p></div>`).join("")}
+      <div class="disclaimer"><strong>⚕️ Medical Disclaimer:</strong> This tool is for clinical decision support only. All treatment decisions must be made by a licensed healthcare professional.</div>
+      </body></html>`);
       w.document.close();
       setTimeout(() => { w.focus(); w.print(); }, 500);
     }
     setExportingPDF(false);
-    showNotif("Clinical PDF report opened for printing/saving", "success");
+    showNotif("PDF opened for printing/saving", "success");
   };
 
   const openSidebar = (content) => { setSidebarContent(content); setSidebarOpen(true); };
 
-  const HISTORY = [
+  const HISTORY_STATIC = [
     { id:"H001", date:"2025-02-15", sampleId:"SAMPLE_AB12CD", drugs:["WARFARIN","CLOPIDOGREL"], highRiskCount:1, status:"Complete", sampleCount:834 },
     { id:"H002", date:"2025-02-10", sampleId:"SAMPLE_XY99ZW", drugs:["CODEINE","SIMVASTATIN","TRAMADOL"], highRiskCount:2, status:"Complete", sampleCount:1247 },
     { id:"H003", date:"2025-01-28", sampleId:"SAMPLE_GH34MN", drugs:["AZATHIOPRINE","IRINOTECAN"], highRiskCount:2, status:"Complete", sampleCount:962 },
     { id:"H004", date:"2025-01-14", sampleId:"SAMPLE_KL77PQ", drugs:["TAMOXIFEN","VORICONAZOLE"], highRiskCount:1, status:"Complete", sampleCount:1108 },
   ];
 
-  // ─── NAV ────────────────────────────────────────────────────────────────────
+  // ── NAV BAR ───────────────────────────────────────────────────────────────────
   const NavBar = () => (
-    <nav style={{ position:"sticky", top:0, zIndex:100, background:"rgba(4,8,16,0.93)", borderBottom:"1px solid rgba(255,255,255,0.07)", backdropFilter:"blur(20px)", padding:"0 24px", display:"flex", alignItems:"center", justifyContent:"space-between", height:62 }}>
-      <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-          <div style={{ width:34, height:34, borderRadius:9, background:"linear-gradient(135deg,#00CFC1,#0F5F73)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17 }}>🧬</div>
+    <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(20px)",borderBottom:"1.5px solid rgba(11,94,215,0.1)",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",height:62,boxShadow:"0 2px 12px rgba(11,94,215,0.06)"}}>
+      {/* Logo */}
+      <div style={{display:"flex",alignItems:"center",gap:14}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer"}} onClick={()=>setPage("main")}>
+          <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#0B5ED7,#094bb3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,boxShadow:"0 4px 12px rgba(11,94,215,0.25)"}}>🧬</div>
           <div>
-            <div className="fraunces" style={{ fontSize:15, fontWeight:800, color:"#d4dbe8", letterSpacing:0.3 }}>PharmaGuard</div>
-            <div style={{ fontSize:9, color:"#00CFC1", fontWeight:700, letterSpacing:2.5 }}>GENETIC ANALYSIS</div>
+            <div style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:800,color:"#0B5ED7",letterSpacing:0.3}}>PharmaGuard</div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#20C997",letterSpacing:3}}>PRECISION MEDICINE</div>
           </div>
         </div>
-        <div className="hide-mobile" style={{ display:"flex", gap:2, marginLeft:16 }}>
-          {[{label:"Dashboard",key:"main"},{label:"History",key:"history"},{label:"About",key:"about"}].map(item => (
-            <button key={item.key} className={`nav-link tab-btn ${page===item.key?"active":""}`} onClick={() => { setPage(item.key); setMobileMenu(false); }}>{item.label}</button>
+        {/* Desktop nav */}
+        <div className="hide-mobile" style={{display:"flex",gap:2,marginLeft:16}}>
+          {NAV_ITEMS.map(item=>(
+            <button key={item.key}
+              className={`nav-link tab-btn ${isNavActive(item)?"active":""}`}
+              onClick={()=>handleNavClick(item)}
+              style={{position:"relative",color:isNavActive(item)?"#0B5ED7":"#495057"}}
+            >
+              {item.label}
+              {item.dot && <span style={{position:"absolute",top:-6,right:-6,width:8,height:8,borderRadius:"50%",background:"#0B5ED7",boxShadow:"0 0 6px rgba(11,94,215,0.5)"}}/>}
+            </button>
           ))}
         </div>
       </div>
-      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-        <button className="pg-btn pg-btn-ghost hide-mobile" onClick={() => openSidebar("notifications")} style={{ padding:"7px 11px", fontSize:16 }}>🔔</button>
-        <button onClick={() => openSidebar("profile")} style={{ display:"flex", alignItems:"center", gap:7, background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:9, padding:"6px 12px", cursor:"pointer", transition:"all 0.18s", color:"#d4dbe8" }}>
-          <div style={{ width:26, height:26, borderRadius:"50%", background:"linear-gradient(135deg,#00CFC1,#00CFC1)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800 }}>DR</div>
-          <span className="hide-mobile" style={{ fontSize:12, fontWeight:600 }}>Dr. Roberts</span>
+      {/* Right side */}
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <button onClick={()=>openSidebar("profile")} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(11,94,215,0.06)",border:"1.5px solid rgba(11,94,215,0.14)",borderRadius:10,padding:"6px 12px",cursor:"pointer",transition:"all 0.18s"}}
+          onMouseEnter={e=>{e.currentTarget.style.background="rgba(11,94,215,0.1)";e.currentTarget.style.borderColor="#0B5ED7";}}
+          onMouseLeave={e=>{e.currentTarget.style.background="rgba(11,94,215,0.06)";e.currentTarget.style.borderColor="rgba(11,94,215,0.14)";}}>
+          <div style={{width:26,height:26,borderRadius:"50%",background:"linear-gradient(135deg,#0B5ED7,#20C997)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#fff"}}>DR</div>
+          <span className="hide-mobile" style={{fontSize:12,fontWeight:600,color:"#212529"}}>Dr. Roberts</span>
         </button>
-        <button className="pg-btn pg-btn-ghost hide-desktop" onClick={() => setMobileMenu(!mobileMenu)} style={{ padding:"7px 11px" }}>{mobileMenu?"✕":"☰"}</button>
+        <button className="hide-desktop pg-btn pg-btn-ghost" style={{padding:"7px 11px"}} onClick={()=>setMobileMenu(!mobileMenu)}>{mobileMenu?"✕":"☰"}</button>
       </div>
+      {/* Mobile menu */}
       {mobileMenu && (
-        <div style={{ position:"absolute", top:62, left:0, right:0, background:"#091415", borderBottom:"1px solid rgba(255,255,255,0.08)", padding:14, display:"flex", flexDirection:"column", gap:6 }}>
-          {[{label:"Dashboard",key:"main"},{label:"History",key:"history"},{label:"About",key:"about"}].map(item => (
-            <button key={item.key} className={`tab-btn ${page===item.key?"active":""}`} onClick={() => { setPage(item.key); setMobileMenu(false); }} style={{ textAlign:"left", padding:"9px 12px" }}>{item.label}</button>
+        <div style={{position:"absolute",top:62,left:0,right:0,background:"#fff",borderBottom:"1.5px solid rgba(11,94,215,0.1)",padding:14,display:"flex",flexDirection:"column",gap:6,boxShadow:"0 8px 20px rgba(11,94,215,0.08)",zIndex:200}}>
+          {NAV_ITEMS.map(item=>(
+            <button key={item.key} className={`tab-btn ${isNavActive(item)?"active":""}`} onClick={()=>handleNavClick(item)} style={{textAlign:"left",padding:"9px 12px"}}>
+              {item.label}{item.dot&&<span style={{marginLeft:6,width:6,height:6,borderRadius:"50%",background:"#0B5ED7",display:"inline-block"}}/>}
+            </button>
           ))}
         </div>
       )}
     </nav>
   );
 
-  // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+  // ── SIDEBAR ───────────────────────────────────────────────────────────────────
   const Sidebar = () => (
     <>
-      <div className={`sidebar-overlay ${sidebarOpen?"open":""}`} onClick={() => setSidebarOpen(false)} />
+      <div className={`sidebar-overlay ${sidebarOpen?"open":""}`} onClick={()=>setSidebarOpen(false)}/>
       <div className={`sidebar ${sidebarOpen?"open":""}`}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:22 }}>
-          <span style={{ fontWeight:700, fontSize:15 }}>{sidebarContent==="profile"?"User Profile":sidebarContent==="history"?"Analysis History":"Notifications"}</span>
-          <button className="pg-btn pg-btn-ghost" onClick={() => setSidebarOpen(false)} style={{ padding:"5px 9px" }}>✕</button>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
+          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:15,color:"#212529"}}>
+            {sidebarContent==="profile"?"User Profile":sidebarContent==="history"?"Analysis History":"Notifications"}
+          </span>
+          <button className="pg-btn pg-btn-ghost" onClick={()=>setSidebarOpen(false)} style={{padding:"5px 9px"}}>✕</button>
         </div>
         {sidebarContent==="profile" && (
           <div>
-            <div style={{ textAlign:"center", marginBottom:22 }}>
-              <div style={{ width:76, height:76, borderRadius:"50%", background:"linear-gradient(135deg,#00CFC1,#00CFC1)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, fontWeight:800, margin:"0 auto 10px" }}>DR</div>
-              <div style={{ fontSize:16, fontWeight:700 }}>Dr. Emily Roberts</div>
-              <div style={{ fontSize:12, color:"#64748b" }}>Clinical Pharmacogenomics</div>
-              <div className="pg-badge" style={{ background:"rgba(0,207,193,0.12)", color:"#4de8db", border:"1px solid rgba(0,207,193,0.25)", marginTop:7 }}>🏥 Mount Sinai Hospital</div>
+            <div style={{textAlign:"center",marginBottom:22}}>
+              <div style={{width:76,height:76,borderRadius:"50%",background:"linear-gradient(135deg,#0B5ED7,#20C997)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,fontWeight:800,color:"#fff",margin:"0 auto 10px"}}>DR</div>
+              <div style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:700,color:"#212529"}}>Dr. Emily Roberts</div>
+              <div style={{fontSize:12,color:"#6c757d"}}>Clinical Pharmacogenomics</div>
+              <div className="pg-badge" style={{background:"rgba(11,94,215,0.08)",color:"#0B5ED7",border:"1px solid rgba(11,94,215,0.2)",marginTop:7}}>🏥 Mount Sinai Hospital</div>
             </div>
-            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-              {[{icon:"📊",l:"Analyses Completed",v:"247"},{icon:"🧬",l:"PGx Reports",v:"184"},{icon:"⭐",l:"Accuracy Score",v:"98.2%"},{icon:"📅",l:"Member Since",v:"Jan 2024"}].map(s => (
-                <div key={s.l} className="pg-card" style={{ padding:"11px 14px", display:"flex", justifyContent:"space-between" }}>
-                  <span style={{ fontSize:12, color:"#94a3b8" }}>{s.icon} {s.l}</span>
-                  <span style={{ fontSize:12, fontWeight:700, color:"#d4dbe8" }}>{s.v}</span>
+            <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+              {[{icon:"📊",l:"Analyses Completed",v:"247"},{icon:"🧬",l:"PGx Reports",v:"184"},{icon:"⭐",l:"Accuracy Score",v:"98.2%"},{icon:"📅",l:"Member Since",v:"Jan 2024"}].map(s=>(
+                <div key={s.l} className="pg-card" style={{padding:"11px 14px",display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:12,color:"#495057"}}>{s.icon} {s.l}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:"#212529"}}>{s.v}</span>
                 </div>
               ))}
             </div>
-            <div style={{ marginTop:18, display:"flex", flexDirection:"column", gap:7 }}>
-              <button className="pg-btn pg-btn-ghost" style={{ width:"100%", justifyContent:"center" }}>⚙️ Settings</button>
-              <button className="pg-btn pg-btn-ghost" style={{ width:"100%", justifyContent:"center", color:"#F05444" }}>🚪 Sign Out</button>
-            </div>
+            <button className="pg-btn pg-btn-primary" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={()=>{setSidebarOpen(false);navigate("/family-section");}}>
+              👨‍👩‍👧‍👦 Go to Family Dashboard
+            </button>
+            <button className="pg-btn pg-btn-ghost" style={{width:"100%",justifyContent:"center"}} onClick={()=>{setSidebarOpen(false);navigate("/technician");}}>
+              🔬 Book Lab Technician
+            </button>
           </div>
         )}
         {sidebarContent==="history" && (
-          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {HISTORY.map(h => (
-              <div key={h.id} className="pg-card" style={{ padding:"13px 14px" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:7 }}>
-                  <span className="mono" style={{ fontSize:11, color:"#4de8db" }}>{h.sampleId}</span>
-                  <span style={{ fontSize:10, color:"#64748b" }}>{h.date}</span>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {HISTORY_STATIC.map(h=>(
+              <div key={h.id} className="pg-card" style={{padding:"13px 14px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}>
+                  <span className="mono" style={{fontSize:11,color:"#0B5ED7"}}>{h.sampleId}</span>
+                  <span style={{fontSize:10,color:"#6c757d"}}>{h.date}</span>
                 </div>
-                <div style={{ fontSize:12, color:"#94a3b8", marginBottom:7 }}>{h.drugs.join(" · ")}</div>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <span className="pg-badge" style={{ background:"rgba(240,84,68,0.12)", color:"#F05444", border:"1px solid rgba(240,84,68,0.25)", fontSize:10 }}>{h.highRiskCount} High Risk</span>
-                  <button className="pg-btn pg-btn-ghost" style={{ padding:"4px 9px", fontSize:10 }}>View</button>
+                <div style={{fontSize:12,color:"#495057",marginBottom:7}}>{h.drugs.join(" · ")}</div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span className="pg-badge" style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"1px solid rgba(239,68,68,0.25)",fontSize:10}}>{h.highRiskCount} High Risk</span>
+                  <button className="pg-btn pg-btn-ghost" style={{padding:"4px 9px",fontSize:10}}>View</button>
                 </div>
               </div>
             ))}
           </div>
         )}
         {sidebarContent==="notifications" && (
-          <div style={{ display:"flex", flexDirection:"column", gap:9 }}>
+          <div style={{display:"flex",flexDirection:"column",gap:9}}>
             {[
-              { icon:"🔔", msg:"New CPIC guideline update for CYP2D6 — Updated October 2024", time:"2h ago", color:"#00CFC1" },
-              { icon:"⚠️", msg:"Patient risk alert: Warfarin + CYP2C9*3 interaction", time:"5h ago", color:"#f59e0b" },
-              { icon:"✅", msg:"Analysis for SAMPLE_AB12CD complete — 1 critical risk detected", time:"1d ago", color:"#00CFC1" },
-              { icon:"📋", msg:"DPWG Fluoropyrimidine guidelines updated", time:"3d ago", color:"#a78bfa" },
-            ].map((n,i) => (
-              <div key={i} className="pg-card" style={{ padding:"11px 13px" }}>
-                <div style={{ display:"flex", gap:9 }}>
-                  <span style={{ fontSize:18 }}>{n.icon}</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:12, color:"#d4dbe8", marginBottom:3, lineHeight:1.5 }}>{n.msg}</div>
-                    <div style={{ fontSize:10, color:"#64748b" }}>{n.time}</div>
+              {icon:"🔔",msg:"New CPIC guideline update for CYP2D6 — October 2024",time:"2h ago"},
+              {icon:"⚠️",msg:"Patient risk alert: Warfarin + CYP2C9*3 interaction",time:"5h ago"},
+              {icon:"✅",msg:"Analysis for SAMPLE_AB12CD complete — 1 critical risk",time:"1d ago"},
+              {icon:"📋",msg:"DPWG Fluoropyrimidine guidelines updated",time:"3d ago"},
+            ].map((n,i)=>(
+              <div key={i} className="pg-card" style={{padding:"11px 13px"}}>
+                <div style={{display:"flex",gap:9}}>
+                  <span style={{fontSize:18}}>{n.icon}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,color:"#212529",marginBottom:3,lineHeight:1.5}}>{n.msg}</div>
+                    <div style={{fontSize:10,color:"#6c757d"}}>{n.time}</div>
                   </div>
                 </div>
               </div>
@@ -1133,31 +984,29 @@ ${Object.entries(results?.drugs || {}).map(([drug, data]) => `
     </>
   );
 
-  // ─── HISTORY PAGE ─────────────────────────────────────────────────────────────
+  // ── HISTORY PAGE ──────────────────────────────────────────────────────────────
   const HistoryPage = () => (
-    <div style={{ padding:"30px 22px", maxWidth:900, margin:"0 auto" }}>
-      <div style={{ marginBottom:28 }}>
-        <div className="fraunces" style={{ fontSize:30, fontWeight:800, marginBottom:6 }}>Analysis History</div>
-        <div style={{ color:"#64748b", fontSize:13 }}>Past pharmacogenomic analysis records for your practice</div>
+    <div style={{padding:"30px 22px",maxWidth:900,margin:"0 auto"}}>
+      <div style={{marginBottom:28}}>
+        <div className="fraunces" style={{fontSize:30,fontWeight:800,marginBottom:6,color:"#212529"}}>Analysis History</div>
+        <div style={{color:"#6c757d",fontSize:13}}>Past pharmacogenomic analysis records for your practice</div>
       </div>
-      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-        {HISTORY.map(h => (
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        {HISTORY_STATIC.map(h=>(
           <div key={h.id} className="pg-card pg-fadeUp">
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
               <div>
-                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:7 }}>
-                  <span className="mono" style={{ color:"#4de8db", fontSize:13 }}>{h.sampleId}</span>
-                  <span className="pg-badge" style={{ background:"rgba(0,207,193,0.12)", color:"#00CFC1", border:"1px solid rgba(0,207,193,0.25)", fontSize:10 }}>{h.status}</span>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:7}}>
+                  <span className="mono" style={{color:"#0B5ED7",fontSize:13}}>{h.sampleId}</span>
+                  <span className="pg-badge" style={{background:"rgba(32,201,151,0.1)",color:"#20C997",border:"1px solid rgba(32,201,151,0.25)",fontSize:10}}>{h.status}</span>
                 </div>
-                <div style={{ color:"#94a3b8", fontSize:12 }}>Drugs: {h.drugs.join(" · ")}</div>
-                <div style={{ fontSize:11, color:"#64748b", marginTop:4 }}>📅 {h.date} · {h.sampleCount} variants analyzed</div>
+                <div style={{color:"#495057",fontSize:12}}>Drugs: {h.drugs.join(" · ")}</div>
+                <div style={{fontSize:11,color:"#6c757d",marginTop:4}}>📅 {h.date} · {h.sampleCount} variants analyzed</div>
               </div>
-              <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-                <span className="pg-badge" style={{ background:"rgba(240,84,68,0.12)", color:"#F05444", border:"1px solid rgba(240,84,68,0.25)", fontSize:11 }}>
-                  ☠️ {h.highRiskCount} Toxic Risk
-                </span>
-                <button className="pg-btn pg-btn-primary" style={{ fontSize:12 }}>📊 View Report</button>
-                <button className="pg-btn pg-btn-ghost" style={{ fontSize:12 }}>⬇ Download</button>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <span className="pg-badge" style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"1px solid rgba(239,68,68,0.25)",fontSize:11}}>☠️ {h.highRiskCount} Toxic Risk</span>
+                <button className="pg-btn pg-btn-primary" style={{fontSize:12}}>📊 View Report</button>
+                <button className="pg-btn pg-btn-ghost" style={{fontSize:12}}>⬇ Download</button>
               </div>
             </div>
           </div>
@@ -1166,147 +1015,128 @@ ${Object.entries(results?.drugs || {}).map(([drug, data]) => `
     </div>
   );
 
-  // ─── ABOUT PAGE ───────────────────────────────────────────────────────────────
+  // ── ABOUT PAGE ────────────────────────────────────────────────────────────────
   const AboutPage = () => (
-    <div style={{ padding:"30px 22px", maxWidth:820, margin:"0 auto" }}>
-      <div className="pg-card" style={{ textAlign:"center", padding:44, marginBottom:22 }}>
-        <div style={{ fontSize:56, marginBottom:14 }}>🧬</div>
-        <div className="fraunces" style={{ fontSize:34, fontWeight:900, marginBottom:10 }}>PharmaGuard</div>
-        <div style={{ color:"#94a3b8", fontSize:14, lineHeight:1.8, maxWidth:540, margin:"0 auto" }}>
+    <div style={{padding:"30px 22px",maxWidth:820,margin:"0 auto"}}>
+      <div className="pg-card" style={{textAlign:"center",padding:44,marginBottom:22}}>
+        <div style={{fontSize:56,marginBottom:14}}>🧬</div>
+        <div className="fraunces" style={{fontSize:34,fontWeight:900,marginBottom:10,color:"#212529"}}>PharmaGuard</div>
+        <div style={{color:"#6c757d",fontSize:14,lineHeight:1.8,maxWidth:540,margin:"0 auto"}}>
           Clinical-grade pharmacogenomic analysis platform powered by CPIC guidelines. Upload patient VCF files to predict drug response, detect toxicity risks, and optimize therapeutic decisions with evidence-based precision.
         </div>
       </div>
-      <div className="grid-3" style={{ marginBottom:22 }}>
-        {[
-          { icon:"🧬", title:"PGx Analysis", desc:"CPIC Level A pharmacogenomic variant detection across 50+ drugs" },
-          { icon:"🛡️", title:"Risk Detection", desc:"Real-time toxicity and efficacy risk scoring with confidence intervals" },
-          { icon:"💊", title:"Drug Guidance", desc:"Evidence-based dosage & clinically validated alternatives" },
-          { icon:"📋", title:"Clinical Reports", desc:"Export-ready JSON, CSV, and printable PDF clinical summaries" },
-          { icon:"🔒", title:"HIPAA Ready", desc:"Local processing — your genomic data never leaves your browser" },
-          { icon:"⚡", title:"Real-time", desc:"Sub-3 second pharmacogenomic analysis with CPIC pipeline" },
-        ].map(f => (
+      <div className="grid-3" style={{marginBottom:22}}>
+        {[{icon:"🧬",title:"PGx Analysis",desc:"CPIC Level A variant detection across 50+ drugs"},{icon:"🛡️",title:"Risk Detection",desc:"Real-time toxicity and efficacy risk scoring"},{icon:"💊",title:"Drug Guidance",desc:"Evidence-based dosage & validated alternatives"},{icon:"📋",title:"Clinical Reports",desc:"Export-ready JSON, CSV, and PDF summaries"},{icon:"🔒",title:"100% Local",desc:"Your genomic data never leaves your browser"},{icon:"⚡",title:"Real-time",desc:"Sub-3 second pharmacogenomic analysis"}].map(f=>(
           <div key={f.title} className="pg-card">
-            <div style={{ fontSize:26, marginBottom:8 }}>{f.icon}</div>
-            <div style={{ fontWeight:700, marginBottom:5, fontSize:13 }}>{f.title}</div>
-            <div style={{ fontSize:12, color:"#64748b", lineHeight:1.6 }}>{f.desc}</div>
+            <div style={{fontSize:26,marginBottom:8}}>{f.icon}</div>
+            <div style={{fontWeight:700,marginBottom:5,fontSize:13,color:"#212529"}}>{f.title}</div>
+            <div style={{fontSize:12,color:"#6c757d",lineHeight:1.6}}>{f.desc}</div>
           </div>
         ))}
       </div>
-      <div className="pg-card" style={{ marginBottom:14 }}>
-        <div style={{ fontWeight:700, marginBottom:10, fontSize:13 }}>Supported Pharmacogenes</div>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
-          {["CYP2D6","CYP2C19","CYP2C9","VKORC1","TPMT","DPYD","SLCO1B1","ABCB1","UGT1A1","HLA-A","HLA-B","NUDT15","CYP3A5","CYP1A2","CYP2B6"].map(g => (
-            <span key={g} className="pg-badge mono" style={{ background:"rgba(0,207,193,0.12)", color:"#4de8db", border:"1px solid rgba(0,207,193,0.22)", fontSize:11 }}>{g}</span>
-          ))}
-        </div>
-      </div>
       <div className="pg-card">
-        <div style={{ fontWeight:700, marginBottom:10, fontSize:13 }}>Drug Coverage ({ALL_DRUGS.length}+ medications)</div>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-          {ALL_DRUGS.slice(0,20).map(d => (
-            <span key={d} className="pg-badge" style={{ background:"rgba(255,255,255,0.05)", color:"#94a3b8", border:"1px solid rgba(255,255,255,0.08)", fontSize:10 }}>{d}</span>
+        <div style={{fontWeight:700,marginBottom:10,fontSize:13,color:"#212529"}}>Supported Pharmacogenes</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+          {["CYP2D6","CYP2C19","CYP2C9","VKORC1","TPMT","DPYD","SLCO1B1","ABCB1","UGT1A1","HLA-A","HLA-B","NUDT15","CYP3A5","CYP1A2","CYP2B6"].map(g=>(
+            <span key={g} className="pg-badge mono" style={{background:"rgba(11,94,215,0.08)",color:"#0B5ED7",border:"1px solid rgba(11,94,215,0.18)",fontSize:11}}>{g}</span>
           ))}
-          <span className="pg-badge" style={{ background:"rgba(0,207,193,0.1)", color:"#4de8db", border:"1px solid rgba(0,207,193,0.2)", fontSize:10 }}>+{ALL_DRUGS.length-20} more</span>
         </div>
       </div>
     </div>
   );
 
-  // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
+  // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
   const MainPage = () => (
-    <div style={{ maxWidth:1180, margin:"0 auto", padding:"30px 22px" }}>
+    <div style={{maxWidth:1180,margin:"0 auto",padding:"30px 22px"}}>
       {/* Hero */}
-      <div className="pg-fadeUp" style={{ textAlign:"center", marginBottom:44, padding:"0 16px" }}>
-        <div className="pg-badge" style={{ background:"rgba(0,207,193,0.12)", color:"#4de8db", border:"1px solid rgba(0,207,193,0.25)", marginBottom:14, display:"inline-flex" }}>
+      <div className="pg-fadeUp" style={{textAlign:"center",marginBottom:44,padding:"0 16px"}}>
+        <div className="pg-badge" style={{background:"rgba(11,94,215,0.08)",color:"#0B5ED7",border:"1px solid rgba(11,94,215,0.2)",marginBottom:14,display:"inline-flex"}}>
           🧬 CPIC Level A Pharmacogenomics · 2024 Guidelines
         </div>
-        <div className="fraunces" style={{ fontSize:"clamp(28px,5.5vw,50px)", fontWeight:900, lineHeight:1.1, marginBottom:14 }}>
-          Patient Genetic<br />
-          <span style={{ background:"linear-gradient(135deg,#00CFC1,#00CFC1)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
-            Drug Risk Analysis
-          </span>
+        <div className="fraunces" style={{fontSize:"clamp(28px,5.5vw,50px)",fontWeight:900,lineHeight:1.1,marginBottom:14,color:"#212529"}}>
+          Patient Genetic<br/><span className="gradient-text">Drug Risk Analysis</span>
         </div>
-        <div style={{ color:"#64748b", fontSize:14, maxWidth:500, margin:"0 auto", lineHeight:1.7 }}>
+        <div style={{color:"#6c757d",fontSize:14,maxWidth:500,margin:"0 auto",lineHeight:1.7}}>
           Upload patient VCF files to analyze pharmacogenomic variants and generate evidence-based drug risk predictions with clinical recommendations.
         </div>
       </div>
 
-      {/* Risk Legend */}
-      <div style={{ display:"flex", justifyContent:"center", gap:14, flexWrap:"wrap", marginBottom:36 }}>
-        {Object.entries(RISK_CONFIG).map(([k,v]) => (
-          <div key={k} style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:"#94a3b8" }}>
-            <div style={{ width:9, height:9, borderRadius:2, background:v.color }} />{v.icon} {k}
+      {/* Risk legend */}
+      <div style={{display:"flex",justifyContent:"center",gap:14,flexWrap:"wrap",marginBottom:36}}>
+        {Object.entries(RISK_CONFIG).map(([k,v])=>(
+          <div key={k} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:"#495057"}}>
+            <div style={{width:9,height:9,borderRadius:2,background:v.color}}/>{v.icon} {k}
           </div>
         ))}
       </div>
 
       {/* STEP 1 — Upload */}
-      <div className="pg-card pg-fadeUp" style={{ marginBottom:20, animationDelay:"0.1s" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:18 }}>
-          <div style={{ width:30, height:30, borderRadius:8, background:"linear-gradient(135deg,#00CFC1,#0F5F73)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:"#fff" }}>1</div>
+      <div className="pg-card pg-fadeUp" style={{marginBottom:20,animationDelay:"0.1s"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
+          <div style={{width:30,height:30,borderRadius:8,background:"linear-gradient(135deg,#0B5ED7,#094bb3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:"#fff"}}>1</div>
           <div>
-            <div style={{ fontWeight:700, fontSize:15 }}>Upload VCF File</div>
-            <div style={{ fontSize:11, color:"#64748b" }}>Upload patient genetic data (.vcf format, max 5MB) — real variant data extracted automatically</div>
+            <div style={{fontWeight:700,fontSize:15,color:"#212529"}}>Upload VCF File</div>
+            <div style={{fontSize:11,color:"#6c757d"}}>Patient genetic data (.vcf format, max 5MB) — parsed entirely in your browser, no data uploaded</div>
           </div>
         </div>
         <div
           className={`drop-zone ${dragging?"dragging":""}`}
-          style={{ border:`2px dashed ${fileStatus==="valid"?"#00CFC1":fileStatus==="error"?"#F05444":"rgba(0,207,193,0.25)"}`, borderRadius:13, padding:"36px 22px", textAlign:"center", cursor:"pointer", background:fileStatus==="valid"?"rgba(0,207,193,0.04)":fileStatus==="error"?"rgba(240,84,68,0.04)":"rgba(0,207,193,0.02)", transition:"all 0.25s" }}
-          onDragOver={e => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
+          style={{border:`2px dashed ${fileStatus==="valid"?"#0B5ED7":fileStatus==="error"?"#ef4444":"rgba(11,94,215,0.25)"}`,borderRadius:13,padding:"36px 22px",textAlign:"center",cursor:"pointer",background:fileStatus==="valid"?"rgba(11,94,215,0.04)":fileStatus==="error"?"rgba(239,68,68,0.04)":"rgba(11,94,215,0.02)",transition:"all 0.25s"}}
+          onDragOver={e=>{e.preventDefault();setDragging(true);}}
+          onDragLeave={()=>setDragging(false)}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={()=>fileInputRef.current?.click()}
         >
-          <input ref={fileInputRef} type="file" accept=".vcf,.vcf.gz" style={{ display:"none" }} onChange={e => handleFile(e.target.files[0])} />
+          <input ref={fileInputRef} type="file" accept=".vcf,.vcf.gz" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
           {fileStatus==="validating" && (
             <div>
-              <div style={{ fontSize:34, marginBottom:10 }} className="pg-pulse">🔬</div>
-              <div style={{ fontWeight:600, color:"#4de8db" }}>Parsing VCF file...</div>
-              <div style={{ fontSize:12, color:"#64748b", marginTop:4 }}>Extracting real variants, PGx genes, quality metrics</div>
+              <div style={{fontSize:34,marginBottom:10}} className="pg-pulse">🔬</div>
+              <div style={{fontWeight:600,color:"#0B5ED7"}}>Parsing VCF file...</div>
+              <div style={{fontSize:12,color:"#6c757d",marginTop:4}}>Extracting variants, PGx genes, quality metrics</div>
             </div>
           )}
           {fileStatus==="valid" && (
             <div>
-              <div style={{ fontSize:34, marginBottom:10 }}>✅</div>
-              <div style={{ fontWeight:700, color:"#00CFC1", fontSize:15 }}>VCF Validated Successfully</div>
-              <div className="mono" style={{ fontSize:12, color:"#64748b", marginTop:4 }}>{file.name} · {(file.size/1024).toFixed(1)} KB · {fileInfo?.fileformat}</div>
-              <div style={{ display:"flex", justifyContent:"center", gap:20, marginTop:14, flexWrap:"wrap" }}>
-                {[{l:"Variants",v:fileInfo?.variants?.toLocaleString()},{l:"PGx Genes",v:fileInfo?.pgxGenes?.length},{l:"Quality",v:`${fileInfo?.quality}%`},{l:"Sample ID",v:fileInfo?.sampleId?.slice(0,14)}].map(s => (
-                  <div key={s.l} style={{ textAlign:"center" }}>
-                    <div className="mono" style={{ fontSize:17, fontWeight:700, color:"#4de8db" }}>{s.v}</div>
-                    <div style={{ fontSize:10, color:"#64748b", letterSpacing:1 }}>{s.l.toUpperCase()}</div>
+              <div style={{fontSize:34,marginBottom:10}}>✅</div>
+              <div style={{fontWeight:700,color:"#0B5ED7",fontSize:15}}>VCF Validated Successfully</div>
+              <div className="mono" style={{fontSize:12,color:"#6c757d",marginTop:4}}>{file.name} · {(file.size/1024).toFixed(1)} KB · {fileInfo?.fileformat}</div>
+              <div style={{display:"flex",justifyContent:"center",gap:20,marginTop:14,flexWrap:"wrap"}}>
+                {[{l:"Variants",v:fileInfo?.variants?.toLocaleString()},{l:"PGx Genes",v:fileInfo?.pgxGenes?.length},{l:"Quality",v:`${fileInfo?.quality}%`},{l:"Sample ID",v:fileInfo?.sampleId?.slice(0,14)}].map(s=>(
+                  <div key={s.l} style={{textAlign:"center"}}>
+                    <div className="mono" style={{fontSize:17,fontWeight:700,color:"#0B5ED7"}}>{s.v}</div>
+                    <div style={{fontSize:10,color:"#6c757d",letterSpacing:1}}>{s.l.toUpperCase()}</div>
                   </div>
                 ))}
               </div>
               {fileInfo?.pgxGenes?.length > 0 && (
-                <div style={{ marginTop:12, display:"flex", gap:6, flexWrap:"wrap", justifyContent:"center" }}>
-                  {fileInfo.pgxGenes.map(g => <span key={g} className="pg-badge mono" style={{ background:"rgba(0,207,193,0.1)", color:"#4de8db", border:"1px solid rgba(0,207,193,0.2)", fontSize:10 }}>{g}</span>)}
+                <div style={{marginTop:12,display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center"}}>
+                  {fileInfo.pgxGenes.map(g=><span key={g} className="pg-badge mono" style={{background:"rgba(11,94,215,0.08)",color:"#0B5ED7",border:"1px solid rgba(11,94,215,0.18)",fontSize:10}}>{g}</span>)}
                 </div>
               )}
-              <button className="pg-btn pg-btn-ghost" style={{ marginTop:14, fontSize:11 }} onClick={e => { e.stopPropagation(); setFile(null); setFileStatus(null); setFileInfo(null); setResults(null); setSelectedDrugs([]); }}>🔄 Upload Different File</button>
+              <button className="pg-btn pg-btn-ghost" style={{marginTop:14,fontSize:11}} onClick={e=>{e.stopPropagation();setFile(null);setFileStatus(null);setFileInfo(null);setResults(null);setSelectedDrugs([]);}}>🔄 Upload Different File</button>
             </div>
           )}
           {fileStatus==="error" && (
             <div>
-              <div style={{ fontSize:34, marginBottom:10 }}>❌</div>
-              <div style={{ fontWeight:700, color:"#F05444" }}>Upload Failed</div>
-              <div style={{ fontSize:12, color:"#94a3b8", marginTop:4 }}>{fileError}</div>
-              <div style={{ fontSize:11, color:"#64748b", marginTop:7 }}>Click to try again</div>
+              <div style={{fontSize:34,marginBottom:10}}>❌</div>
+              <div style={{fontWeight:700,color:"#ef4444"}}>Upload Failed</div>
+              <div style={{fontSize:12,color:"#6c757d",marginTop:4}}>{fileError}</div>
+              <div style={{fontSize:11,color:"#adb5bd",marginTop:7}}>Click to try again</div>
             </div>
           )}
           {!fileStatus && (
             <div>
-              <div style={{ fontSize:44, marginBottom:10 }} className={dragging?"pg-float":""}>📁</div>
-              <div style={{ fontWeight:600, fontSize:15, marginBottom:5 }}>Drag & drop your VCF file</div>
-              <div style={{ color:"#64748b", fontSize:12 }}>or click to browse · .vcf format · real variant parsing · max 5MB</div>
-              <button className="pg-btn pg-btn-primary" style={{ marginTop:14 }} onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}>📂 Browse Files</button>
+              <div style={{fontSize:44,marginBottom:10}} className={dragging?"pg-float":""}>📁</div>
+              <div style={{fontWeight:600,fontSize:15,marginBottom:5,color:"#212529"}}>Drag & drop your VCF file</div>
+              <div style={{color:"#6c757d",fontSize:12}}>or click to browse · .vcf format · parsed locally · max 5MB</div>
+              <button className="pg-btn pg-btn-primary" style={{marginTop:14}} onClick={e=>{e.stopPropagation();fileInputRef.current?.click();}}>📂 Browse Files</button>
             </div>
           )}
         </div>
         {!fileStatus && (
-          <div style={{ textAlign:"center", marginTop:10 }}>
-            <button className="pg-btn pg-btn-ghost" style={{ fontSize:11 }}
-              onClick={() => handleFile(new File(["##fileformat=VCFv4.2\n##reference=GRCh38\n##source=IlluminaDRAGEN\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE_DEMO\nchr22\t42523528\trs16947\tC\tT\t99.5\tPASS\tGENE=CYP2D6;IMPACT=HIGH\tGT:DP\t0/1:45\nchr10\t96540410\trs1799853\tC\tT\t98.1\tPASS\tGENE=CYP2C9;IMPACT=HIGH\tGT:DP\t0/1:52\nchr10\t96702048\trs4244285\tG\tA\t97.3\tPASS\tGENE=CYP2C19;IMPACT=HIGH\tGT:DP\t1/1:48\nchr6\t18143956\trs1800460\tC\tT\t99.0\tPASS\tGENE=TPMT;IMPACT=HIGH\tGT:DP\t0/1:61\nchr1\t97915614\trs3918290\tC\tT\t96.8\tPASS\tGENE=DPYD;IMPACT=HIGH\tGT:DP\t0/1:39\nchr12\t21331549\trs4149056\tT\tC\t99.1\tPASS\tGENE=SLCO1B1;IMPACT=HIGH\tGT:DP\t1/1:57\nchr16\t31102380\trs9923231\tC\tT\t98.4\tPASS\tGENE=VKORC1;IMPACT=HIGH\tGT:DP\t0/1:44\n"], "demo_patient_GRCh38.vcf", { type:"text/plain" }))}>
+          <div style={{textAlign:"center",marginTop:10}}>
+            <button className="pg-btn pg-btn-ghost" style={{fontSize:11}}
+              onClick={()=>handleFile(new File(["##fileformat=VCFv4.2\n##reference=GRCh38\n##source=IlluminaDRAGEN\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE_DEMO\nchr22\t42523528\trs16947\tC\tT\t99.5\tPASS\tGENE=CYP2D6;IMPACT=HIGH\tGT:DP\t0/1:45\nchr10\t96540410\trs1799853\tC\tT\t98.1\tPASS\tGENE=CYP2C9;IMPACT=HIGH\tGT:DP\t0/1:52\nchr10\t96702048\trs4244285\tG\tA\t97.3\tPASS\tGENE=CYP2C19;IMPACT=HIGH\tGT:DP\t1/1:48\nchr6\t18143956\trs1800460\tC\tT\t99.0\tPASS\tGENE=TPMT;IMPACT=HIGH\tGT:DP\t0/1:61\nchr1\t97915614\trs3918290\tC\tT\t96.8\tPASS\tGENE=DPYD;IMPACT=HIGH\tGT:DP\t0/1:39\nchr12\t21331549\trs4149056\tT\tC\t99.1\tPASS\tGENE=SLCO1B1;IMPACT=HIGH\tGT:DP\t1/1:57\nchr16\t31102380\trs9923231\tC\tT\t98.4\tPASS\tGENE=VKORC1;IMPACT=HIGH\tGT:DP\t0/1:44\n"],"demo_patient_GRCh38.vcf",{type:"text/plain"}))}>
               🎯 Load Demo VCF (with real PGx variants)
             </button>
           </div>
@@ -1315,188 +1145,157 @@ ${Object.entries(results?.drugs || {}).map(([drug, data]) => `
 
       {/* STEP 2 — Drug Selection */}
       {fileStatus==="valid" && (
-        <div className="pg-card pg-fadeUp" style={{ marginBottom:20 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:18 }}>
-            <div style={{ width:30, height:30, borderRadius:8, background:"linear-gradient(135deg,#00CFC1,#0F5F73)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:"#fff" }}>2</div>
+        <div className="pg-card pg-fadeUp" style={{marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
+            <div style={{width:30,height:30,borderRadius:8,background:"linear-gradient(135deg,#0B5ED7,#094bb3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:"#fff"}}>2</div>
             <div>
-              <div style={{ fontWeight:700, fontSize:15 }}>Select Drugs to Analyze</div>
-              <div style={{ fontSize:11, color:"#64748b" }}>{ALL_DRUGS.length}+ drugs supported — type to search or browse all</div>
+              <div style={{fontWeight:700,fontSize:15,color:"#212529"}}>Select Drugs to Analyze</div>
+              <div style={{fontSize:11,color:"#6c757d"}}>{ALL_DRUGS.length}+ drugs — type to search</div>
             </div>
           </div>
-          <input
-            ref={drugInputRef}
-            className="pg-input"
-            placeholder="🔍 Search any drug (e.g. Warfarin, Codeine, Metoprolol...)"
-            value={drugSearch}
-            onChange={handleDrugSearch}
-            style={{ marginBottom:12 }}
-          />
+          <input ref={drugInputRef} className="pg-input" placeholder="🔍 Search drug (e.g. Warfarin, Codeine, Metoprolol...)" value={drugSearch} onChange={e=>setDrugSearch(e.target.value)} style={{marginBottom:12}}/>
           {filteredDrugs.length > 0 && (
-            <div style={{ maxHeight:180, overflowY:"auto", display:"flex", flexWrap:"wrap", gap:6, marginBottom:12, padding:"2px 0" }}>
-              {filteredDrugs.slice(0, 60).map(d => (
-                <button key={d} className="pg-btn pg-btn-ghost" style={{ fontSize:11, padding:"5px 11px", borderRadius:7 }}
-                  onClick={() => { setSelectedDrugs(prev => [...prev, d]); setDrugSearch(""); setTimeout(() => drugInputRef.current?.focus(), 10); }}>
+            <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+              {filteredDrugs.slice(0,60).map(d=>(
+                <button key={d} className="pg-btn pg-btn-ghost" style={{fontSize:11,padding:"5px 11px",borderRadius:7}}
+                  onClick={()=>{setSelectedDrugs(p=>[...p,d]);setDrugSearch("");setTimeout(()=>drugInputRef.current?.focus(),10);}}>
                   + {d}
                 </button>
               ))}
-              {filteredDrugs.length > 60 && <span style={{ fontSize:11, color:"#64748b", alignSelf:"center" }}>+{filteredDrugs.length-60} more — refine search</span>}
+              {filteredDrugs.length>60&&<span style={{fontSize:11,color:"#6c757d",alignSelf:"center"}}>+{filteredDrugs.length-60} more</span>}
             </div>
           )}
           {selectedDrugs.length > 0 && (
             <div>
-              <div style={{ fontSize:10, color:"#64748b", marginBottom:7, letterSpacing:1.2, fontWeight:600 }}>SELECTED ({selectedDrugs.length})</div>
-              <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
-                {selectedDrugs.map(d => (
-                  <span key={d} className="pg-badge" style={{ background:"rgba(0,207,193,0.15)", color:"#4de8db", border:"1px solid rgba(0,207,193,0.35)", fontSize:12, cursor:"pointer", padding:"5px 11px" }}
-                    onClick={() => setSelectedDrugs(prev => prev.filter(x => x !== d))}>
-                    💊 {d} <span style={{ marginLeft:4, opacity:0.65 }}>✕</span>
+              <div style={{fontSize:10,color:"#6c757d",marginBottom:7,letterSpacing:1.2,fontWeight:600}}>SELECTED ({selectedDrugs.length})</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                {selectedDrugs.map(d=>(
+                  <span key={d} className="pg-badge" style={{background:"rgba(11,94,215,0.1)",color:"#0B5ED7",border:"1px solid rgba(11,94,215,0.25)",fontSize:12,cursor:"pointer",padding:"5px 11px"}} onClick={()=>setSelectedDrugs(p=>p.filter(x=>x!==d))}>
+                    💊 {d} <span style={{marginLeft:4,opacity:0.65}}>✕</span>
                   </span>
                 ))}
               </div>
             </div>
           )}
-          {drugSearch && filteredDrugs.length === 0 && (
-            <div style={{ textAlign:"center", padding:18, color:"#64748b", fontSize:12 }}>No matching drugs found for "{drugSearch}"</div>
-          )}
+          {drugSearch && filteredDrugs.length===0 && <div style={{textAlign:"center",padding:18,color:"#6c757d",fontSize:12}}>No matches for "{drugSearch}"</div>}
         </div>
       )}
 
       {/* STEP 3 — Analyze */}
       {fileStatus==="valid" && (
-        <div className="pg-fadeUp" style={{ textAlign:"center", marginBottom:36 }}>
+        <div className="pg-fadeUp" style={{textAlign:"center",marginBottom:36}}>
           <button
-            className={`pg-btn ${selectedDrugs.length > 0 ? "pg-btn-primary pg-glow" : "pg-btn-ghost"}`}
-            style={{ fontSize:15, padding:"13px 34px", borderRadius:13, opacity:selectedDrugs.length > 0 ? 1 : 0.5, cursor:selectedDrugs.length > 0 ? "pointer" : "not-allowed" }}
-            onClick={doAnalysis}
-            disabled={selectedDrugs.length === 0 || analyzing}
+            className={`pg-btn ${selectedDrugs.length>0?"pg-btn-primary pg-glow":"pg-btn-ghost"}`}
+            style={{fontSize:15,padding:"13px 34px",borderRadius:13,opacity:selectedDrugs.length>0?1:0.5,cursor:selectedDrugs.length>0?"pointer":"not-allowed"}}
+            onClick={doAnalysis} disabled={selectedDrugs.length===0||analyzing}
           >
-            {analyzing ? "⟳ Analyzing..." : "🔬 Run Pharmacogenomic Analysis"}
+            {analyzing?"⟳ Analyzing...":"🔬 Run Pharmacogenomic Analysis"}
           </button>
-          {selectedDrugs.length === 0 && <div style={{ fontSize:11, color:"#64748b", marginTop:7 }}>Select at least one drug to continue</div>}
+          {selectedDrugs.length===0&&<div style={{fontSize:11,color:"#6c757d",marginTop:7}}>Select at least one drug to continue</div>}
         </div>
       )}
 
-      {/* Loading */}
-      {analyzing && (
-        <div className="pg-card pg-fadeUp scan-effect" style={{ marginBottom:22 }}>
-          <DNALoader />
-        </div>
-      )}
+      {analyzing && <div className="pg-card pg-fadeUp scan-effect" style={{marginBottom:22}}><DNALoader/></div>}
 
       {/* Results */}
       {results && !analyzing && (
         <div id="results-section">
           {results.alert && (
-            <div className="pg-fadeUp" style={{ padding:"14px 18px", borderRadius:13, marginBottom:18, background:results.summary.highRisk.length > 0 ? "rgba(139,47,47,0.12)" : "rgba(245,158,11,0.1)", border:`1px solid ${results.summary.highRisk.length > 0 ? "rgba(139,47,47,0.35)" : "rgba(245,158,11,0.3)"}`, display:"flex", alignItems:"center", gap:10 }}>
-              <span style={{ fontSize:22 }}>🚨</span>
+            <div className="pg-fadeUp" style={{padding:"14px 18px",borderRadius:13,marginBottom:18,background:results.summary.highRisk.length>0?"rgba(220,38,38,0.08)":"rgba(245,158,11,0.08)",border:`1px solid ${results.summary.highRisk.length>0?"rgba(220,38,38,0.3)":"rgba(245,158,11,0.3)"}`,display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:22}}>🚨</span>
               <div>
-                <div style={{ fontWeight:700, color:results.summary.highRisk.length > 0 ? "#F05444" : "#f59e0b", fontSize:13 }}>Clinical Alert</div>
-                <div style={{ fontSize:12, color:"#94a3b8", lineHeight:1.5 }}>{results.alert}</div>
+                <div style={{fontWeight:700,color:results.summary.highRisk.length>0?"#dc2626":"#f59e0b",fontSize:13}}>Clinical Alert</div>
+                <div style={{fontSize:12,color:"#495057",lineHeight:1.5}}>{results.alert}</div>
               </div>
             </div>
           )}
 
-          {/* Summary strip */}
-          <div className="grid-4" style={{ marginBottom:20 }}>
-            {[{l:"Toxic Risk",c:results.summary.highRisk.length,col:"#F05444",icon:"☠️"},{l:"Adjust Dose",c:results.summary.adjustDosage.length,col:"#f59e0b",icon:"⚖️"},{l:"Ineffective",c:results.summary.ineffective.length,col:"#F05444",icon:"🚫"},{l:"Safe",c:results.summary.safe.length,col:"#00CFC1",icon:"🛡️"}].map(s => (
-              <div key={s.l} className="pg-card" style={{ textAlign:"center", padding:"14px 10px" }}>
-                <div style={{ fontSize:22, marginBottom:3 }}>{s.icon}</div>
-                <div className="fraunces" style={{ fontSize:26, fontWeight:800, color:s.col, animation:"countUp 0.6s ease" }}>{s.c}</div>
-                <div style={{ fontSize:10, color:"#64748b", letterSpacing:1 }}>{s.l.toUpperCase()}</div>
+          {/* Summary */}
+          <div className="grid-4" style={{marginBottom:20}}>
+            {[{l:"Toxic Risk",c:results.summary.highRisk.length,col:"#dc2626",icon:"☠️"},{l:"Adjust Dose",c:results.summary.adjustDosage.length,col:"#f59e0b",icon:"⚖️"},{l:"Ineffective",c:results.summary.ineffective.length,col:"#ef4444",icon:"🚫"},{l:"Safe",c:results.summary.safe.length,col:"#20C997",icon:"🛡️"}].map(s=>(
+              <div key={s.l} className="pg-card" style={{textAlign:"center",padding:"14px 10px"}}>
+                <div style={{fontSize:22,marginBottom:3}}>{s.icon}</div>
+                <div className="fraunces" style={{fontSize:26,fontWeight:800,color:s.col}}>{s.c}</div>
+                <div style={{fontSize:10,color:"#6c757d",letterSpacing:1}}>{s.l.toUpperCase()}</div>
               </div>
             ))}
           </div>
 
           {/* Tabs */}
-          <div style={{ display:"flex", gap:3, marginBottom:18, flexWrap:"wrap", background:"rgba(255,255,255,0.025)", borderRadius:11, padding:5 }}>
-            {[{id:"cards",label:"💊 Risk Cards"},{id:"detail",label:"📋 Detailed Report"},{id:"json",label:"{ } JSON Viewer"},{id:"metrics",label:"📊 Quality Metrics"}].map(t => (
-              <button key={t.id} className={`tab-btn ${activeTab===t.id?"active":""}`} onClick={() => setActiveTab(t.id)}>{t.label}</button>
+          <div style={{display:"flex",gap:3,marginBottom:18,flexWrap:"wrap",background:"rgba(11,94,215,0.04)",borderRadius:11,padding:5}}>
+            {[{id:"cards",label:"💊 Risk Cards"},{id:"detail",label:"📋 Detailed Report"},{id:"json",label:"{ } JSON Viewer"},{id:"metrics",label:"📊 Quality Metrics"}].map(t=>(
+              <button key={t.id} className={`tab-btn ${activeTab===t.id?"active":""}`} onClick={()=>setActiveTab(t.id)}>{t.label}</button>
             ))}
           </div>
 
-          {/* Tab: Cards */}
           {activeTab==="cards" && (
             <div className="grid-2">
-              {Object.entries(results.drugs).map(([drug, data], i) => (
-                <RiskCard key={drug} drug={drug} data={data} delay={i*0.08} />
-              ))}
+              {Object.entries(results.drugs).map(([drug,data],i)=><RiskCard key={drug} drug={drug} data={data} delay={i*0.08}/>)}
             </div>
           )}
 
-          {/* Tab: Detailed */}
           {activeTab==="detail" && (
-            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-              {Object.entries(results.drugs).map(([drug, data]) => {
-                const cfg = RISK_CONFIG[data.risk] || RISK_CONFIG.Unknown;
-                return (
-                  <DetailCard key={drug} drug={drug} data={data} cfg={cfg} />
-                );
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {Object.entries(results.drugs).map(([drug,data])=>{
+                const cfg=RISK_CONFIG[data.risk]||RISK_CONFIG.Unknown;
+                return <DetailCard key={drug} drug={drug} data={data} cfg={cfg}/>;
               })}
             </div>
           )}
 
-          {/* Tab: JSON */}
           {activeTab==="json" && (
             <div className="pg-card">
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, flexWrap:"wrap", gap:10 }}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
                 <div>
-                  <div style={{ fontWeight:700, fontSize:14 }}>📋 Clinical JSON Report</div>
-                  <div style={{ fontSize:11, color:"#64748b" }}>CPIC-compliant pharmacogenomic report structure</div>
+                  <div style={{fontWeight:700,fontSize:14,color:"#212529"}}>📋 Clinical JSON Report</div>
+                  <div style={{fontSize:11,color:"#6c757d"}}>CPIC-compliant pharmacogenomic report</div>
                 </div>
-                <div style={{ display:"flex", gap:7 }}>
-                  <button className="pg-btn pg-btn-ghost" onClick={copyJSON} style={{ fontSize:11 }}>📋 Copy</button>
-                  <button className="pg-btn pg-btn-success" onClick={downloadJSON} style={{ fontSize:11 }}>⬇ Download JSON</button>
+                <div style={{display:"flex",gap:7}}>
+                  <button className="pg-btn pg-btn-ghost" onClick={copyJSON} style={{fontSize:11}}>📋 Copy</button>
+                  <button className="pg-btn pg-btn-success" onClick={downloadJSON} style={{fontSize:11}}>⬇ Download JSON</button>
                 </div>
               </div>
-              <div className="mono" style={{ background:"rgba(0,0,0,0.45)", borderRadius:11, padding:18, fontSize:11, color:"#b8f5f0", maxHeight:520, overflowY:"auto", lineHeight:1.85, border:"1px solid rgba(255,255,255,0.05)", whiteSpace:"pre-wrap", wordBreak:"break-all" }}>
+              <div className="mono" style={{background:"rgba(11,94,215,0.04)",border:"1.5px solid rgba(11,94,215,0.12)",borderRadius:11,padding:18,fontSize:11,color:"#212529",maxHeight:520,overflowY:"auto",lineHeight:1.85,whiteSpace:"pre-wrap",wordBreak:"break-all"}}>
                 {JSON.stringify(clinicalJSON, null, 2)}
               </div>
             </div>
           )}
 
-          {/* Tab: Metrics */}
           {activeTab==="metrics" && (
             <div className="grid-2">
               <div className="pg-card">
-                <div style={{ fontWeight:700, marginBottom:18, fontSize:14 }}>📊 VCF Quality Metrics</div>
-                <MiniBarChart value={fileInfo?.quality || 98} color="#00CFC1" label="Parse Quality" />
-                <MiniBarChart value={Math.round((results.vcfQuality?.variantConfidence||94))} color="#00CFC1" label="Variant Conf." />
-                <MiniBarChart value={Math.round((results.vcfQuality?.annotationCoverage||91))} color="#a78bfa" label="Annotation Cov." />
-                <MiniBarChart value={Math.min(99, Math.round(((results.vcfQuality?.pgxVariants||5)/10)*100))} color="#f59e0b" label="PGx Coverage" />
-                <div style={{ marginTop:14, display:"flex", gap:10, flexWrap:"wrap" }}>
-                  <div style={{ flex:1, background:"rgba(0,0,0,0.2)", borderRadius:9, padding:"10px 12px" }}>
-                    <div style={{ fontSize:10, color:"#64748b", letterSpacing:1, marginBottom:4 }}>TOTAL VARIANTS</div>
-                    <div className="mono" style={{ fontSize:18, color:"#4de8db", fontWeight:700 }}>{fileInfo?.variants?.toLocaleString() || 0}</div>
+                <div style={{fontWeight:700,marginBottom:18,fontSize:14,color:"#212529"}}>📊 VCF Quality Metrics</div>
+                <MiniBarChart value={fileInfo?.quality||98} color="#0B5ED7" label="Parse Quality"/>
+                <MiniBarChart value={Math.round(results.vcfQuality?.variantConfidence||94)} color="#0B5ED7" label="Variant Conf."/>
+                <MiniBarChart value={Math.round(results.vcfQuality?.annotationCoverage||91)} color="#a78bfa" label="Annotation Cov."/>
+                <MiniBarChart value={Math.min(99,Math.round(((results.vcfQuality?.pgxVariants||5)/10)*100))} color="#f59e0b" label="PGx Coverage"/>
+                <div style={{marginTop:14,display:"flex",gap:10}}>
+                  <div style={{flex:1,background:"rgba(11,94,215,0.04)",borderRadius:9,padding:"10px 12px",border:"1px solid rgba(11,94,215,0.08)"}}>
+                    <div style={{fontSize:10,color:"#6c757d",letterSpacing:1,marginBottom:4}}>TOTAL VARIANTS</div>
+                    <div className="mono" style={{fontSize:18,color:"#0B5ED7",fontWeight:700}}>{fileInfo?.variants?.toLocaleString()||0}</div>
                   </div>
-                  <div style={{ flex:1, background:"rgba(0,0,0,0.2)", borderRadius:9, padding:"10px 12px" }}>
-                    <div style={{ fontSize:10, color:"#64748b", letterSpacing:1, marginBottom:4 }}>PGx GENES</div>
-                    <div className="mono" style={{ fontSize:18, color:"#00CFC1", fontWeight:700 }}>{fileInfo?.pgxGenes?.length || 0}</div>
+                  <div style={{flex:1,background:"rgba(32,201,151,0.06)",borderRadius:9,padding:"10px 12px",border:"1px solid rgba(32,201,151,0.15)"}}>
+                    <div style={{fontSize:10,color:"#6c757d",letterSpacing:1,marginBottom:4}}>PGx GENES</div>
+                    <div className="mono" style={{fontSize:18,color:"#20C997",fontWeight:700}}>{fileInfo?.pgxGenes?.length||0}</div>
                   </div>
                 </div>
               </div>
               <div className="pg-card">
-                <div style={{ fontWeight:700, marginBottom:18, fontSize:14 }}>🎯 Drug Confidence Scores</div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:14, justifyContent:"center" }}>
-                  {Object.entries(results.drugs).map(([drug, data]) => {
-                    const cfg = RISK_CONFIG[data.risk] || RISK_CONFIG.Unknown;
-                    return <CircularProgress key={drug} value={Math.round((data.confidence||0)*100)} size={72} color={cfg.color} label={drug.slice(0,7)} />;
+                <div style={{fontWeight:700,marginBottom:18,fontSize:14,color:"#212529"}}>🎯 Drug Confidence Scores</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:14,justifyContent:"center"}}>
+                  {Object.entries(results.drugs).map(([drug,data])=>{
+                    const cfg=RISK_CONFIG[data.risk]||RISK_CONFIG.Unknown;
+                    return <CircularProgress key={drug} value={Math.round((data.confidence||0)*100)} size={72} color={cfg.color} label={drug.slice(0,7)}/>;
                   })}
                 </div>
               </div>
-              <div className="pg-card" style={{ gridColumn:"1/-1" }}>
-                <div style={{ fontWeight:700, marginBottom:14, fontSize:14 }}>🔬 Analysis Metadata</div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:10 }}>
-                  {[
-                    {l:"Sample ID", v:results.sampleId, mono:true},
-                    {l:"VCF Format", v:fileInfo?.fileformat || "VCFv4.2", mono:true},
-                    {l:"Reference", v:fileInfo?.metadata?.reference || "GRCh38", mono:true},
-                    {l:"Analyzed At", v:new Date(results.analyzedAt).toLocaleTimeString()},
-                    {l:"Drugs Analyzed", v:Object.keys(results.drugs).length},
-                    {l:"Guideline", v:"CPIC 2024"},
-                  ].map(s => (
-                    <div key={s.l} style={{ background:"rgba(0,0,0,0.2)", borderRadius:9, padding:"10px 12px", border:"1px solid rgba(255,255,255,0.05)" }}>
-                      <div style={{ fontSize:10, color:"#64748b", letterSpacing:1, marginBottom:5, fontWeight:600 }}>{s.l.toUpperCase()}</div>
-                      <div className={s.mono?"mono":""} style={{ fontSize:12, color:"#4de8db", fontWeight:600 }}>{s.v}</div>
+              <div className="pg-card" style={{gridColumn:"1/-1"}}>
+                <div style={{fontWeight:700,marginBottom:14,fontSize:14,color:"#212529"}}>🔬 Analysis Metadata</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10}}>
+                  {[{l:"Sample ID",v:results.sampleId,mono:true},{l:"VCF Format",v:fileInfo?.fileformat||"VCFv4.2",mono:true},{l:"Reference",v:fileInfo?.metadata?.reference||"GRCh38",mono:true},{l:"Analyzed At",v:new Date(results.analyzedAt).toLocaleTimeString()},{l:"Drugs Analyzed",v:Object.keys(results.drugs).length},{l:"Guideline",v:"CPIC 2024"}].map(s=>(
+                    <div key={s.l} style={{background:"rgba(11,94,215,0.04)",borderRadius:9,padding:"10px 12px",border:"1px solid rgba(11,94,215,0.08)"}}>
+                      <div style={{fontSize:10,color:"#6c757d",letterSpacing:1,marginBottom:5,fontWeight:600}}>{s.l.toUpperCase()}</div>
+                      <div className={s.mono?"mono":""} style={{fontSize:12,color:"#0B5ED7",fontWeight:600}}>{s.v}</div>
                     </div>
                   ))}
                 </div>
@@ -1505,18 +1304,16 @@ ${Object.entries(results?.drugs || {}).map(([drug, data]) => `
           )}
 
           {/* Export bar */}
-          <div className="pg-card" style={{ marginTop:20, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center", justifyContent:"space-between" }}>
+          <div className="pg-card" style={{marginTop:20,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
             <div>
-              <div style={{ fontSize:13, fontWeight:600 }}>📥 Export Clinical Results</div>
-              <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>Download in multiple formats for EHR integration and clinical records</div>
+              <div style={{fontSize:13,fontWeight:600,color:"#212529"}}>📥 Export Clinical Results</div>
+              <div style={{fontSize:11,color:"#6c757d",marginTop:2}}>Download for EHR integration and clinical records</div>
             </div>
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              <button className="pg-btn pg-btn-success" onClick={downloadJSON} style={{ fontSize:11 }}>⬇ JSON Report</button>
-              <button className="pg-btn pg-btn-ghost" onClick={downloadCSV} style={{ fontSize:11 }}>📊 CSV Export</button>
-              <button className="pg-btn pg-btn-primary" onClick={downloadClinicalPDF} disabled={exportingPDF} style={{ fontSize:11 }}>
-                {exportingPDF ? "⟳ Generating..." : "📄 Clinical PDF"}
-              </button>
-              <button className="pg-btn pg-btn-ghost" onClick={copyJSON} style={{ fontSize:11 }}>📋 Copy JSON</button>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button className="pg-btn pg-btn-success" onClick={downloadJSON} style={{fontSize:11}}>⬇ JSON Report</button>
+              <button className="pg-btn pg-btn-ghost" onClick={downloadCSV} style={{fontSize:11}}>📊 CSV Export</button>
+              <button className="pg-btn pg-btn-primary" onClick={downloadClinicalPDF} disabled={exportingPDF} style={{fontSize:11}}>{exportingPDF?"⟳ Generating...":"📄 Clinical PDF"}</button>
+              <button className="pg-btn pg-btn-ghost" onClick={copyJSON} style={{fontSize:11}}>📋 Copy JSON</button>
             </div>
           </div>
         </div>
@@ -1524,113 +1321,50 @@ ${Object.entries(results?.drugs || {}).map(([drug, data]) => `
     </div>
   );
 
+  // ── RENDER ────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight:"100vh", background:"#060e0f", color:"#d4dbe8" }}>
-      {/* BG grid */}
-      <div style={{ position:"fixed", inset:0, zIndex:0, pointerEvents:"none", backgroundImage:"radial-gradient(rgba(0,207,193,0.04) 1px, transparent 1px)", backgroundSize:"30px 30px" }} />
-      <div style={{ position:"fixed", top:-300, left:-200, width:700, height:700, borderRadius:"50%", background:"radial-gradient(circle,rgba(0,207,193,0.06),transparent 70%)", zIndex:0, pointerEvents:"none" }} />
-      <div style={{ position:"fixed", bottom:-250, right:-150, width:600, height:600, borderRadius:"50%", background:"radial-gradient(circle,rgba(0,207,193,0.05),transparent 70%)", zIndex:0, pointerEvents:"none" }} />
+    <div style={{minHeight:"100vh",background:"#F8F9FA",color:"#212529"}}>
+      {/* Background grid */}
+      <div style={{position:"fixed",inset:0,zIndex:0,pointerEvents:"none",backgroundImage:"radial-gradient(rgba(11,94,215,0.06) 1px,transparent 1px)",backgroundSize:"30px 30px"}}/>
+      <div style={{position:"fixed",top:-300,right:-200,width:700,height:700,borderRadius:"50%",background:"radial-gradient(circle,rgba(11,94,215,0.05),transparent 70%)",zIndex:0,pointerEvents:"none"}}/>
+      <div style={{position:"fixed",bottom:-200,left:-100,width:500,height:500,borderRadius:"50%",background:"radial-gradient(circle,rgba(32,201,151,0.04),transparent 70%)",zIndex:0,pointerEvents:"none"}}/>
 
-      <div style={{ position:"relative", zIndex:1 }}>
-        <NavBar />
-        {page==="main" && <MainPage />}
-        {page==="history" && <HistoryPage />}
-        {page==="about" && <AboutPage />}
-        <Sidebar />
+      <div style={{position:"relative",zIndex:1}}>
+        <NavBar/>
+        {page==="main"    && <MainPage/>}
+        {page==="history" && <HistoryPage/>}
+        {page==="about"   && <AboutPage/>}
+        <Sidebar/>
 
         {/* Footer */}
-        <footer style={{ borderTop:"1px solid rgba(255,255,255,0.06)", marginTop:40, padding:"28px 24px" }}>
-          <div style={{ maxWidth:900, margin:"0 auto" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8, justifyContent:"center", marginBottom:16 }}>
-              <span style={{ fontSize:16 }}>🧬</span>
-              <span className="fraunces" style={{ fontWeight:700, color:"#d4dbe8" }}>PharmaGuard v3.0</span>
-              <span style={{ color:"#475569", fontSize:12 }}>· CPIC Guidelines 2024 ·</span>
-              <span style={{ color:"#00CFC1", fontSize:12 }}>Clinical Decision Support</span>
+        <footer style={{borderTop:"1.5px solid rgba(11,94,215,0.1)",padding:"40px 24px 28px",maxWidth:1100,margin:"0 auto"}}>
+          <div style={{background:"rgba(11,94,215,0.04)",border:"1.5px solid rgba(11,94,215,0.12)",borderRadius:12,padding:"14px 18px",marginBottom:16,textAlign:"center"}}>
+            <div style={{fontSize:12,color:"#6c757d",lineHeight:1.7}}>
+              <strong style={{color:"#0B5ED7"}}>Confidence Scores</strong> reflect concordance between detected variants and CPIC guideline evidence tiers. Scores ≥90% indicate Level A evidence.
             </div>
-            <div style={{ background:"rgba(0,207,193,0.07)", border:"1px solid rgba(0,207,193,0.15)", borderRadius:10, padding:"12px 16px", marginBottom:14, textAlign:"center" }}>
-              <div style={{ fontSize:11, color:"#64748b", lineHeight:1.7 }}>
-                <strong style={{ color:"#4de8db" }}>Confidence Scores</strong> reflect the concordance between detected variants and CPIC guideline evidence tiers. Scores ≥90% indicate Level A evidence. Lower scores may reflect incomplete variant coverage or intermediate phenotypes requiring clinical judgment.
+          </div>
+          <div style={{background:"rgba(245,158,11,0.05)",border:"1.5px solid rgba(245,158,11,0.2)",borderRadius:12,padding:"16px 18px",marginBottom:24}}>
+            <div style={{fontSize:12,color:"#b45309",fontWeight:700,marginBottom:6}}>⚕️ Medical Use Limitation Notice</div>
+            <div style={{fontSize:11,color:"#6c757d",lineHeight:1.8}}>
+              This tool is intended for clinical decision support and research use only. <strong style={{color:"#212529"}}>It must not replace professional medical judgment.</strong> All pharmacogenomic findings should be interpreted by a qualified healthcare professional.
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:28,height:28,borderRadius:7,background:"linear-gradient(135deg,#0B5ED7,#094bb3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>🧬</div>
+              <div>
+                <div className="fraunces" style={{fontSize:13,fontWeight:800,color:"#212529"}}>PharmaGuard v3.0</div>
+                <div className="mono" style={{fontSize:9,color:"#6c757d"}}>CPIC Guidelines 2024 · Clinical Decision Support</div>
               </div>
             </div>
-            <div style={{ background:"rgba(245,158,11,0.06)", border:"1px solid rgba(245,158,11,0.18)", borderRadius:10, padding:"16px 18px" }}>
-              <div style={{ fontSize:12, color:"#f59e0b", fontWeight:700, marginBottom:6 }}>⚕️ Medical Use Limitation Notice</div>
-              <div style={{ fontSize:11, color:"#94a3b8", lineHeight:1.8 }}>
-                The pharmacogenomic predictions generated by this system are based on detected genetic variants and current guideline-based interpretations. While every effort is made to ensure accuracy, genomic interpretation may be incomplete due to sequencing limitations, missing variants, or evolving clinical guidelines. <strong style={{ color:"#d4dbe8" }}>This tool is intended for clinical decision support and research use only and must not replace professional medical judgment.</strong> All pharmacogenomic findings should be interpreted by a qualified healthcare professional — prescribing decisions must always be made by a licensed clinician in consultation with the patient. Consult a clinical pharmacologist or genetic counselor for complex multi-drug scenarios.
-              </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {["Privacy Policy","Terms of Use","Contact","Documentation"].map(l=>(
+                <button key={l} className="pg-btn pg-btn-ghost" style={{fontSize:11,padding:"5px 12px"}}>{l}</button>
+              ))}
             </div>
           </div>
         </footer>
       </div>
-    </div>
-  );
-}
-
-// ─── DETAIL CARD (extracted to avoid hooks-in-map issue) ─────────────────────
-function DetailCard({ drug, data, cfg }) {
-  const [infoOpen, setInfoOpen] = useState(false);
-  return (
-    <div className="pg-card" style={{ border:`1px solid ${cfg.border}` }}>
-      {infoOpen && <InfoModal drug={drug} data={data} onClose={() => setInfoOpen(false)} />}
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
-        <span style={{ fontSize:24 }}>{cfg.icon}</span>
-        <div style={{ flex:1 }}>
-          <div className="fraunces" style={{ fontSize:18, fontWeight:800 }}>{drug}</div>
-          <span className="pg-badge" style={{ background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}`, fontSize:11 }}>{cfg.label}</span>
-          <span style={{ marginLeft:6, fontSize:11, color:"#64748b" }}>{data.category}</span>
-        </div>
-        <button className="info-btn" onClick={() => setInfoOpen(true)} title="View detailed risk explanation" style={{ width:32, height:32, fontSize:14 }}>ℹ</button>
-        <CircularProgress value={Math.round((data.confidence||0)*100)} size={62} color={cfg.color} label="CONF." />
-      </div>
-      <Accordion title="Pharmacogenomic Profile" icon="🧬" defaultOpen>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:10, marginBottom:14 }}>
-          {[{l:"Gene",v:data.gene},{l:"Diplotype",v:data.diplotype},{l:"Phenotype",v:data.phenotypeLabel||data.phenotype},{l:"CPIC Level",v:data.cpic}].map(f => (
-            <div key={f.l} style={{ background:"rgba(0,0,0,0.2)", borderRadius:9, padding:"9px 12px", border:"1px solid rgba(255,255,255,0.05)" }}>
-              <div style={{ fontSize:10, color:"#64748b", letterSpacing:1.2, marginBottom:4, fontWeight:600 }}>{f.l.toUpperCase()}</div>
-              <div className="mono" style={{ fontSize:11, color:"#d4dbe8" }}>{f.v}</div>
-            </div>
-          ))}
-        </div>
-        {(data.variants||[]).length > 0 && (
-          <div style={{ overflowX:"auto" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
-              <thead><tr style={{ borderBottom:"1px solid rgba(255,255,255,0.07)" }}>
-                {["rsID","Allele","Impact","Consequence"].map(h => <th key={h} style={{ padding:"6px 10px", textAlign:"left", color:"#64748b", fontWeight:600, fontSize:10, letterSpacing:1 }}>{h.toUpperCase()}</th>)}
-              </tr></thead>
-              <tbody>
-                {(data.variants||[]).map((v,i) => (
-                  <tr key={i} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
-                    <td className="mono" style={{ padding:"6px 10px", color:"#4de8db", fontSize:11 }}>{v.rsid||v.id}</td>
-                    <td className="mono" style={{ padding:"6px 10px", color:"#d4dbe8" }}>{v.allele}</td>
-                    <td style={{ padding:"6px 10px" }}>
-                      <span className="pg-badge" style={{ background:v.impact==="HIGH"?"rgba(240,84,68,0.12)":"rgba(245,158,11,0.12)", color:v.impact==="HIGH"?"#F05444":"#f59e0b", border:`1px solid ${v.impact==="HIGH"?"rgba(240,84,68,0.25)":"rgba(245,158,11,0.25)"}`, fontSize:10 }}>{v.impact}</span>
-                    </td>
-                    <td style={{ padding:"6px 10px", color:"#94a3b8", fontSize:11 }}>{v.consequence}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Accordion>
-      <Accordion title="Clinical Recommendation" icon="💊">
-        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {[{l:"Dosage Guidance",v:data.dosage,col:"#f59e0b"},{l:"Alternative Drug",v:data.alternative,col:"#00CFC1"},{l:"CPIC Guideline",v:data.cpic,col:"#4de8db"}].map(f => (
-            <div key={f.l} style={{ display:"flex", gap:10, padding:"9px 12px", background:"rgba(0,0,0,0.2)", borderRadius:9 }}>
-              <div style={{ fontSize:11, color:"#64748b", minWidth:120, fontWeight:500 }}>{f.l}</div>
-              <div style={{ fontSize:12, color:f.col, fontWeight:600, lineHeight:1.5 }}>{f.v}</div>
-            </div>
-          ))}
-        </div>
-      </Accordion>
-      <Accordion title="Mechanism & Risk Explanation" icon="🔬">
-        <div style={{ fontSize:13, color:"#94a3b8", lineHeight:1.8, background:"rgba(0,0,0,0.2)", padding:14, borderRadius:9, marginBottom:10 }}>{data.mechanism}</div>
-        <div style={{ fontSize:13, color:"#d4dbe8", lineHeight:1.8, background:cfg.bg, padding:14, borderRadius:9, border:`1px solid ${cfg.border}40` }}>
-          <strong style={{ color:cfg.color }}>⚠ Why {data.risk}?</strong><br/>{data.whyRisk}
-        </div>
-        <div style={{ marginTop:12 }}>
-          <MiniBarChart value={data.geneImpact} color={cfg.color} label={data.gene} />
-        </div>
-      </Accordion>
     </div>
   );
 }
