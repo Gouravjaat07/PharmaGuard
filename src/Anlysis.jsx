@@ -1754,7 +1754,6 @@ ${Object.entries(results?.drugs || {}).map(([drug, data]) => `
       </div>
     </div>
   );
-<<<<<<< HEAD
 }
 
 
@@ -3400,7 +3399,4 @@ ${Object.entries(results?.drugs || {}).map(([drug, data]) => `
 //       </div>
 //     </div>
 //   );
-// }
-=======
-}
->>>>>>> 8a9c22e (Remove dots)
+
