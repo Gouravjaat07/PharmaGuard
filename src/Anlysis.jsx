@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 // ─── REAL VCF PARSER ────────────────────────────────────────────────────────────
 const parseVCF = async (file) => {
   const text = await file.text();
@@ -80,266 +82,27 @@ const parseVCF = async (file) => {
 };
 
 // ─── DRUG DATABASE (COMPLETE WITH ALL COMMON DRUGS) ─────────────────────────────
-const ALL_DRUGS = [
-  "ABACAVIR","AMITRIPTYLINE","ATAZANAVIR","ATOMOXETINE","AZATHIOPRINE",
-  "CARBAMAZEPINE","CITALOPRAM","CLOMIPRAMINE","CLOPIDOGREL","CODEINE",
-  "DESIPRAMINE","DOXEPIN","EFAVIRENZ","ESCITALOPRAM","FLUVOXAMINE",
-  "FLUOROURACIL","IMIPRAMINE","IRINOTECAN","MERCAPTOPURINE","METOPROLOL",
-  "NORTRIPTYLINE","OLANZAPINE","ONDANSETRON","OXCARBAZEPINE","OXYCODONE",
-  "PAROXETINE","PHENYTOIN","RISPERIDONE","SERTRALINE","SIMVASTATIN",
-  "TAMOXIFEN","THIOGUANINE","TRAMADOL","TRIMIPRAMINE","VENLAFAXINE",
-  "VORICONAZOLE","WARFARIN","LOVASTATIN","PRAVASTATIN","ATORVASTATIN",
-  "FLUVASTATIN","CELECOXIB","DICLOFENAC","IBUPROFEN","PIROXICAM",
-  "ALLOPURINOL","RASBURICASE","DAPSONE","PRIMAQUINE","CHLOROQUINE",
-  "TACROLIMUS","SIROLIMUS","CYCLOSPORINE","MYCOPHENOLATE","AZATHIOPRINE",
-  "CAPECITABINE","TEGAFUR","MERCAPTOPURINE","THIOGUANINE","GEFITINIB",
-  "ERLOTINIB","LAPATINIB","IMATINIB","METFORMIN","GLIPIZIDE","GLIMEPIRIDE"
-];
-
-// ─── COMPREHENSIVE DRUG DATA ─────────────────────────────────────────────────────
-const DRUG_DATABASE = {
-  CODEINE: {
-    gene: "CYP2D6", diplotype: "*1/*2", phenotype: "URM",
-    phenotypeLabel: "Ultrarapid Metabolizer",
-    risk: "Toxic", severity: "critical", confidence: 0.91,
-    mechanism: "CYP2D6 ultrarapid metabolism converts codeine to morphine at an accelerated rate, leading to dangerously elevated morphine plasma levels. This causes severe opioid effects including respiratory depression, sedation, and potentially fatal overdose even at standard doses.",
-    whyRisk: "Your genetic profile shows duplicated CYP2D6 gene copies, causing ultrarapid conversion of codeine to its active morphine metabolite. Standard doses become toxic because your body processes codeine ~3-5x faster than average metabolizers.",
-    cpic: "CPIC Level A", dosage: "Avoid codeine entirely — use non-CYP2D6-dependent opioid", alternative: "Morphine (titrated carefully) or Hydromorphone",
-    variants: [{ rsid: "rs16947", allele: "C>T", impact: "HIGH", gene: "CYP2D6", consequence: "Increased activity" }, { rsid: "rs1135840", allele: "G>C", impact: "MODERATE", gene: "CYP2D6", consequence: "Altered splicing" }],
-    geneImpact: 94, references: ["PMID:23222671","CPIC Guideline 2014"], category: "Opioid Analgesic"
-  },
-  WARFARIN: {
-    gene: "CYP2C9 + VKORC1", diplotype: "*1/*3", phenotype: "IM",
-    phenotypeLabel: "Intermediate Metabolizer",
-    risk: "Adjust Dosage", severity: "high", confidence: 0.88,
-    mechanism: "Reduced CYP2C9 activity decreases warfarin S-enantiomer clearance, increasing anticoagulant effect. The VKORC1 variant reduces enzyme levels, increasing sensitivity to warfarin's mechanism of action.",
-    whyRisk: "Your CYP2C9*3 allele reduces warfarin metabolism by ~90% compared to wildtype. Combined with your VKORC1 variant, your stable warfarin dose is predicted to be 2-3mg/day versus the typical 5mg/day population average.",
-    cpic: "CPIC Level A", dosage: "Reduce initial dose by 25–50%; frequent INR monitoring required in first 4 weeks", alternative: "Apixaban or Rivaroxaban (no dose adjustment needed)",
-    variants: [{ rsid: "rs1799853", allele: "C>T", impact: "HIGH", gene: "CYP2C9", consequence: "p.Arg144Cys — reduced activity" }, { rsid: "rs9923231", allele: "C>T", impact: "HIGH", gene: "VKORC1", consequence: "Promoter variant — reduced expression" }],
-    geneImpact: 78, references: ["PMID:21900891","IWPC 2009"], category: "Anticoagulant"
-  },
-  CLOPIDOGREL: {
-    gene: "CYP2C19", diplotype: "*2/*2", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Ineffective", severity: "high", confidence: 0.96,
-    mechanism: "CYP2C19 loss-of-function variants prevent bioactivation of clopidogrel prodrug. Without active metabolite formation, platelet P2Y12 receptors remain uninhibited, leaving patients vulnerable to thrombotic events including stent thrombosis and MI.",
-    whyRisk: "Your *2/*2 diplotype means you carry two non-functional CYP2C19 copies. This completely abolishes the conversion of clopidogrel to its active thienopyridine metabolite — you receive essentially no antiplatelet benefit from this drug.",
-    cpic: "CPIC Level A", dosage: "Avoid clopidogrel — use alternative antiplatelet agent", alternative: "Ticagrelor 90mg BID or Prasugrel 10mg QD (if no contraindication)",
-    variants: [{ rsid: "rs4244285", allele: "G>A", impact: "HIGH", gene: "CYP2C19", consequence: "p.Pro227Leu — loss of function *2 allele" }, { rsid: "rs4986893", allele: "G>A", impact: "HIGH", gene: "CYP2C19", consequence: "p.Trp212Ter — premature stop codon *3 allele" }],
-    geneImpact: 96, references: ["PMID:21716271","TRITON-TIMI 38"], category: "Antiplatelet"
-  },
-  SIMVASTATIN: {
-    gene: "SLCO1B1", diplotype: "*5/*5", phenotype: "PM",
-    phenotypeLabel: "Poor Transporter Function",
-    risk: "Toxic", severity: "high", confidence: 0.83,
-    mechanism: "SLCO1B1 deficiency impairs hepatic uptake transporter OATP1B1, causing simvastatin and its active acid form to accumulate in systemic circulation rather than being cleared by the liver. Elevated plasma concentrations dramatically increase myopathy and rhabdomyolysis risk.",
-    whyRisk: "Your SLCO1B1*5 homozygous genotype reduces hepatic simvastatin uptake by ~70%. At standard 40mg doses, you face a 15-fold increased risk of myopathy. The risk scales steeply with dose — 80mg simvastatin is essentially contraindicated.",
-    cpic: "CPIC Level A", dosage: "Maximum 20mg/day simvastatin if continued; strongly consider statin switch", alternative: "Rosuvastatin or Pravastatin (not SLCO1B1-dependent)",
-    variants: [{ rsid: "rs4149056", allele: "T>C", impact: "HIGH", gene: "SLCO1B1", consequence: "p.Val174Ala — reduced OATP1B1 function" }],
-    geneImpact: 85, references: ["PMID:20019282","SEARCH Collaboration 2008"], category: "Statin"
-  },
-  AZATHIOPRINE: {
-    gene: "TPMT", diplotype: "*3A/*3A", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Toxic", severity: "critical", confidence: 0.99,
-    mechanism: "TPMT enzyme deficiency causes shunting of 6-MP metabolism toward cytotoxic thioguanine nucleotides (TGN). Accumulation of TGNs causes severe, potentially life-threatening myelosuppression including profound neutropenia, anemia, and thrombocytopenia.",
-    whyRisk: "TPMT *3A/*3A is the most severe loss-of-function genotype — you have essentially zero TPMT enzyme activity. Standard azathioprine doses would produce TGN levels 10-40x above the toxic threshold, causing severe bone marrow suppression within weeks.",
-    cpic: "CPIC Level A", dosage: "Reduce dose by 90% (e.g., 10% of standard) OR use alternative immunosuppressant", alternative: "Mycophenolate mofetil or Cyclosporine (non-TPMT dependent)",
-    variants: [{ rsid: "rs1800460", allele: "C>T", impact: "HIGH", gene: "TPMT", consequence: "p.Ala154Thr — *3A haplotype component" }, { rsid: "rs1142345", allele: "T>C", impact: "HIGH", gene: "TPMT", consequence: "p.Tyr240Cys — *3A haplotype component" }],
-    geneImpact: 99, references: ["PMID:21270794","CPIC Thiopurine 2018"], category: "Immunosuppressant"
-  },
-  FLUOROURACIL: {
-    gene: "DPYD", diplotype: "*2A/*1", phenotype: "IM",
-    phenotypeLabel: "Intermediate Metabolizer",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.77,
-    mechanism: "Partial DPYD deficiency reduces catabolism of fluorouracil (5-FU), increasing drug exposure (AUC) and causing disproportionate toxicity including severe mucositis, neutropenia, and neurotoxicity.",
-    whyRisk: "Your DPYD *2A heterozygous status reduces fluoropyrimidine clearance by approximately 50%. At standard doses, you would experience significantly higher 5-FU plasma concentrations, increasing risk of grade 3-4 toxicities to ~30-40% vs ~10% in normal metabolizers.",
-    cpic: "CPIC Level A", dosage: "Reduce starting dose by 50%; increase based on toxicity and pharmacokinetic monitoring", alternative: "Capecitabine at reduced dose (same DPYD consideration applies)",
-    variants: [{ rsid: "rs3918290", allele: "C>T", impact: "HIGH", gene: "DPYD", consequence: "IVS14+1G>A — splice site disruption, exon 14 skipping" }],
-    geneImpact: 72, references: ["PMID:23988873","DPWG 2020"], category: "Chemotherapy"
-  },
-  CITALOPRAM: {
-    gene: "CYP2C19", diplotype: "*2/*2", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.82,
-    mechanism: "CYP2C19 poor metabolizers show dramatically increased citalopram plasma levels (2-3x), raising risk of QTc prolongation and dose-dependent adverse effects.",
-    whyRisk: "Your CYP2C19 *2/*2 genotype eliminates citalopram metabolism. At standard 20-40mg doses, plasma levels equivalent to 60-80mg in a normal metabolizer are expected, exceeding FDA maximum dose safety thresholds for QTc risk.",
-    cpic: "CPIC Level A", dosage: "Maximum 20mg/day; consider ECG monitoring", alternative: "Sertraline (less CYP2C19 dependent) or Mirtazapine",
-    variants: [{ rsid: "rs4244285", allele: "G>A", impact: "HIGH", gene: "CYP2C19", consequence: "Loss-of-function *2 allele" }],
-    geneImpact: 78, references: ["CPIC CYP2C19 Antidepressant 2015"], category: "Antidepressant (SSRI)"
-  },
-  AMITRIPTYLINE: {
-    gene: "CYP2D6 + CYP2C19", diplotype: "*4/*4", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Toxic", severity: "high", confidence: 0.88,
-    mechanism: "CYP2D6 and CYP2C19 deficiency markedly reduces TCA metabolism, leading to accumulation of amitriptyline and nortriptyline with cardiotoxic and CNS effects.",
-    whyRisk: "Dual CYP2D6/CYP2C19 poor metabolizer status causes 5-10x higher TCA concentrations. Risk of QRS prolongation, arrhythmia, and serotonin toxicity is substantially elevated at standard doses.",
-    cpic: "CPIC Level A", dosage: "Avoid if possible; if used, reduce dose by 50% with plasma level monitoring", alternative: "Escitalopram or Mirtazapine",
-    variants: [{ rsid: "rs3892097", allele: "G>A", impact: "HIGH", gene: "CYP2D6", consequence: "*4 null allele — splicing defect" }],
-    geneImpact: 88, references: ["CPIC TCA 2016"], category: "Antidepressant (TCA)"
-  },
-  METOPROLOL: {
-    gene: "CYP2D6", diplotype: "*4/*4", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.79,
-    mechanism: "CYP2D6 poor metabolizers accumulate metoprolol at 5-fold higher plasma concentrations, causing excessive beta-blockade including bradycardia, hypotension, and bronchoconstriction.",
-    whyRisk: "Standard metoprolol doses in CYP2D6 poor metabolizers produce plasma levels equivalent to 5x overdose in normal metabolizers. Bradycardia risk is substantially increased, especially in elderly patients.",
-    cpic: "CPIC Level B", dosage: "Reduce dose by 50-75%; titrate based on heart rate and blood pressure", alternative: "Bisoprolol or Carvedilol (less CYP2D6 dependent)",
-    variants: [{ rsid: "rs3892097", allele: "G>A", impact: "HIGH", gene: "CYP2D6", consequence: "Null allele — no enzyme production" }],
-    geneImpact: 71, references: ["DPWG Metoprolol 2019"], category: "Beta Blocker"
-  },
-  TRAMADOL: {
-    gene: "CYP2D6", diplotype: "*1/*2", phenotype: "URM",
-    phenotypeLabel: "Ultrarapid Metabolizer",
-    risk: "Toxic", severity: "high", confidence: 0.85,
-    mechanism: "CYP2D6 ultrarapid metabolism converts tramadol to O-desmethyltramadol (M1) at excessive rates, causing opioid overdose syndrome including respiratory depression.",
-    whyRisk: "As a CYP2D6 ultrarapid metabolizer, your body converts tramadol to its active opioid metabolite so rapidly that standard analgesic doses can cause life-threatening respiratory depression — the same risk mechanism as codeine toxicity.",
-    cpic: "CPIC Level A", dosage: "Avoid tramadol — use non-CYP2D6 dependent analgesic", alternative: "Non-opioid: NSAIDs, acetaminophen, or gabapentin",
-    variants: [{ rsid: "rs16947", allele: "C>T", impact: "HIGH", gene: "CYP2D6", consequence: "Increased enzyme activity" }],
-    geneImpact: 87, references: ["CPIC Codeine/Tramadol 2014"], category: "Opioid Analgesic"
-  },
-  TAMOXIFEN: {
-    gene: "CYP2D6", diplotype: "*4/*4", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Ineffective", severity: "high", confidence: 0.86,
-    mechanism: "CYP2D6 catalyzes tamoxifen conversion to endoxifen, its primary active metabolite responsible for breast cancer cell growth inhibition. Poor metabolizers produce inadequate endoxifen levels.",
-    whyRisk: "Your CYP2D6 poor metabolizer status results in endoxifen concentrations ~70-80% lower than normal metabolizers. Clinical studies show significantly reduced breast cancer recurrence-free survival in CYP2D6 poor metabolizers on tamoxifen.",
-    cpic: "CPIC Level A", dosage: "Tamoxifen may be insufficient — consider alternative endocrine therapy", alternative: "Aromatase inhibitor (Anastrozole, Letrozole) if post-menopausal",
-    variants: [{ rsid: "rs3892097", allele: "G>A", impact: "HIGH", gene: "CYP2D6", consequence: "Null allele — absent enzyme" }],
-    geneImpact: 86, references: ["PMID:22532592","CPIC Tamoxifen 2018"], category: "Hormone Therapy (Oncology)"
-  },
-  IRINOTECAN: {
-    gene: "UGT1A1", diplotype: "*28/*28", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer (Reduced Glucuronidation)",
-    risk: "Toxic", severity: "critical", confidence: 0.92,
-    mechanism: "UGT1A1*28 reduces glucuronidation of SN-38 (active irinotecan metabolite), causing accumulation of this toxic topoisomerase inhibitor and severe GI and hematological toxicity.",
-    whyRisk: "The *28/*28 genotype (TA7 repeat) reduces UGT1A1 expression by ~70%. SN-38 accumulation causes grade 3-4 diarrhea in >40% of patients and life-threatening neutropenia. FDA label requires dose reduction for this genotype.",
-    cpic: "CPIC Level A", dosage: "Reduce starting dose by 25-50%; increase subsequent doses based on toxicity", alternative: "Oxaliplatin-based regimen if appropriate",
-    variants: [{ rsid: "rs887829", allele: "TA6>TA7", impact: "HIGH", gene: "UGT1A1", consequence: "*28 promoter repeat — reduced transcription" }],
-    geneImpact: 91, references: ["PMID:24587463","FDA Irinotecan Label 2014"], category: "Chemotherapy"
-  },
-  ALLOPURINOL: {
-    gene: "HLA-B", diplotype: "*58:01 carrier", phenotype: "Risk Allele",
-    phenotypeLabel: "Hypersensitivity Risk Carrier",
-    risk: "Toxic", severity: "critical", confidence: 0.97,
-    mechanism: "HLA-B*58:01 is strongly associated with allopurinol-induced severe cutaneous adverse reactions (SCAR) including Stevens-Johnson syndrome (SJS) and toxic epidermal necrolysis (TEN), with mortality rates up to 30%.",
-    whyRisk: "Carrying HLA-B*58:01 increases SJS/TEN risk from baseline 0.03% to 5-8% in Asian populations. The FDA label recommends screening for HLA-B*58:01 in high-risk populations before prescribing. This is a contraindication in multiple national guidelines.",
-    cpic: "CPIC Level A", dosage: "Avoid allopurinol — contraindicated", alternative: "Febuxostat (XO inhibitor, no HLA association) or Probenecid",
-    variants: [{ rsid: "rs2395029", allele: "HLA-B*58:01", impact: "HIGH", gene: "HLA-B", consequence: "Immune hypersensitivity risk variant" }],
-    geneImpact: 97, references: ["PMID:21228675","CPIC HLA 2015"], category: "Gout/Uric Acid"
-  },
-  CARBAMAZEPINE: {
-    gene: "HLA-A + HLA-B", diplotype: "HLA-B*15:02 carrier", phenotype: "Risk Allele",
-    phenotypeLabel: "Hypersensitivity Risk Carrier",
-    risk: "Toxic", severity: "critical", confidence: 0.95,
-    mechanism: "HLA-B*15:02 confers high risk for carbamazepine-induced SJS/TEN in Asian populations. HLA-A*31:01 is associated with carbamazepine hypersensitivity syndrome (DRESS) across all ethnicities.",
-    whyRisk: "HLA-B*15:02 carriers have a 10% risk of SJS/TEN with carbamazepine — 40-80x higher than non-carriers. FDA mandates screening in patients of Asian ancestry before prescribing. This is a near-absolute contraindication.",
-    cpic: "CPIC Level A", dosage: "Avoid carbamazepine — use alternative anticonvulsant", alternative: "Valproate, Lamotrigine (HLA-test first), or Levetiracetam",
-    variants: [{ rsid: "rs3909184", allele: "HLA-B*15:02", impact: "HIGH", gene: "HLA-B", consequence: "Severe cutaneous reaction risk" }],
-    geneImpact: 95, references: ["PMID:21205684","FDA CBZ Label 2008"], category: "Anticonvulsant"
-  },
-  ONDANSETRON: {
-    gene: "CYP2D6", diplotype: "*1/*2", phenotype: "URM",
-    phenotypeLabel: "Ultrarapid Metabolizer",
-    risk: "Ineffective", severity: "low", confidence: 0.72,
-    mechanism: "CYP2D6 ultrarapid metabolizers clear ondansetron very rapidly, reducing plasma concentrations and antiemetic efficacy. This may lead to inadequate nausea/vomiting control.",
-    whyRisk: "Ultrarapid CYP2D6 metabolism reduces ondansetron AUC by ~60% vs normal metabolizers. In chemotherapy-induced nausea, subtherapeutic levels may necessitate dose escalation or alternative antiemetics.",
-    cpic: "CPIC Level B+", dosage: "May need dose increase or more frequent dosing; monitor antiemetic response", alternative: "Granisetron (not CYP2D6 dependent) or Dexamethasone-based regimens",
-    variants: [{ rsid: "rs16947", allele: "C>T", impact: "MODERATE", gene: "CYP2D6", consequence: "Increased enzyme copies" }],
-    geneImpact: 58, references: ["CPIC Ondansetron 2017"], category: "Antiemetic"
-  },
-  SERTRALINE: {
-    gene: "CYP2C19 + CYP2D6", diplotype: "*1/*1 / *1/*1", phenotype: "NM",
-    phenotypeLabel: "Normal Metabolizer",
-    risk: "Safe", severity: "none", confidence: 0.81,
-    mechanism: "Sertraline is metabolized by multiple CYP enzymes. Normal metabolizer status predicts standard pharmacokinetics and typical antidepressant response.",
-    whyRisk: "Your metabolizer profile is normal for both primary sertraline-metabolizing enzymes. Standard dosing is expected to produce therapeutic plasma levels within the normal range. No genetic dose adjustment is indicated.",
-    cpic: "CPIC Level C", dosage: "Initiate at standard dose (50mg/day); titrate based on clinical response", alternative: "No pharmacogenomic-based alternative needed",
-    variants: [],
-    geneImpact: 15, references: ["CPIC SSRI 2015"], category: "Antidepressant (SSRI)"
-  },
-  VORICONAZOLE: {
-    gene: "CYP2C19", diplotype: "*2/*2", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Toxic", severity: "high", confidence: 0.89,
-    mechanism: "CYP2C19 poor metabolizers accumulate voriconazole at 4-fold higher plasma concentrations, leading to neurotoxicity (hallucinations, encephalopathy), hepatotoxicity, and QTc prolongation.",
-    whyRisk: "Standard voriconazole doses in CYP2C19 poor metabolizers produce plasma levels consistently in the toxic range. Visual disturbances, hallucinations, and liver toxicity are markedly increased. Most guidelines recommend avoiding or drastically reducing doses.",
-    cpic: "CPIC Level A", dosage: "Reduce dose by 50% or consider therapeutic drug monitoring with target trough <5.5 mg/L", alternative: "Isavuconazole or Posaconazole (not CYP2C19 dependent)",
-    variants: [{ rsid: "rs4244285", allele: "G>A", impact: "HIGH", gene: "CYP2C19", consequence: "Loss-of-function *2 allele" }, { rsid: "rs4986893", allele: "G>A", impact: "HIGH", gene: "CYP2C19", consequence: "Loss-of-function *3 allele" }],
-    geneImpact: 88, references: ["CPIC Voriconazole 2016"], category: "Antifungal"
-  },
-  TACROLIMUS: {
-    gene: "CYP3A5", diplotype: "*3/*3", phenotype: "PM",
-    phenotypeLabel: "Non-Expressor",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.84,
-    mechanism: "CYP3A5 *3/*3 homozygotes are non-expressors of CYP3A5, leading to reduced tacrolimus clearance and higher dose-adjusted trough concentrations, increasing nephrotoxicity risk.",
-    whyRisk: "As a CYP3A5 non-expressor, your tacrolimus dose requirements are significantly lower than expressors. Without dose adjustment, over-immunosuppression and nephrotoxicity are likely. Target trough monitoring is critical.",
-    cpic: "CPIC Level A", dosage: "Reduce starting dose by ~30%; guide by therapeutic drug monitoring (target trough 5-15 ng/mL)", alternative: "Cyclosporine with appropriate monitoring",
-    variants: [{ rsid: "rs776746", allele: "G>A", impact: "HIGH", gene: "CYP3A5", consequence: "*3 splice site — no CYP3A5 expression" }],
-    geneImpact: 82, references: ["CPIC Tacrolimus 2015","PMID:26479988"], category: "Immunosuppressant"
-  },
-  PHENYTOIN: {
-    gene: "CYP2C9 + HLA-B", diplotype: "*1/*3 / HLA-B*15:02", phenotype: "IM + Risk",
-    phenotypeLabel: "Intermediate Metabolizer + Hypersensitivity Risk",
-    risk: "Toxic", severity: "high", confidence: 0.87,
-    mechanism: "CYP2C9*3 reduces phenytoin hydroxylation, causing drug accumulation and dose-dependent toxicity (ataxia, nystagmus). HLA-B*15:02 confers SJS/TEN risk independent of metabolism.",
-    whyRisk: "Dual risk: your CYP2C9 variant causes ~2x higher phenytoin exposure vs normal metabolizers, and HLA-B*15:02 carriage adds severe cutaneous hypersensitivity risk. Both risks necessitate alternative anticonvulsant selection.",
-    cpic: "CPIC Level A", dosage: "If phenytoin must be used, reduce dose by 25-50% with plasma level monitoring; avoid if HLA-B*15:02 positive", alternative: "Levetiracetam or Valproate (no CYP2C9 or HLA concern)",
-    variants: [{ rsid: "rs1057910", allele: "A>C", impact: "HIGH", gene: "CYP2C9", consequence: "p.Ile359Leu — *3 reduced activity allele" }],
-    geneImpact: 84, references: ["CPIC Phenytoin 2020"], category: "Anticonvulsant"
-  },
-  CAPECITABINE: {
-    gene: "DPYD", diplotype: "*2A/*1", phenotype: "IM",
-    phenotypeLabel: "Intermediate Metabolizer",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.77,
-    mechanism: "Capecitabine is a prodrug converted to fluorouracil. DPYD deficiency reduces 5-FU catabolism, causing systemic drug accumulation and enhanced toxicity.",
-    whyRisk: "The same DPYD risk that applies to 5-FU applies to capecitabine. Your *2A heterozygous status predicts ~50% reduced fluoropyrimidine clearance, requiring upfront dose reduction to avoid severe mucositis and myelosuppression.",
-    cpic: "CPIC Level A", dosage: "Reduce starting dose by 50%; escalate based on tolerance", alternative: "Non-fluoropyrimidine regimen if alternatives exist",
-    variants: [{ rsid: "rs3918290", allele: "C>T", impact: "HIGH", gene: "DPYD", consequence: "Splice site — exon 14 skipping" }],
-    geneImpact: 72, references: ["DPWG Fluoropyrimidine 2020"], category: "Chemotherapy"
-  },
-  MERCAPTOPURINE: {
-    gene: "TPMT + NUDT15", diplotype: "*3A/*3A", phenotype: "PM",
-    phenotypeLabel: "Poor Metabolizer",
-    risk: "Toxic", severity: "critical", confidence: 0.98,
-    mechanism: "TPMT deficiency causes thioguanine nucleotide accumulation identical to azathioprine toxicity. Additionally, NUDT15 variants further impair thiopurine metabolism, causing additive myelosuppression risk.",
-    whyRisk: "TPMT *3A/*3A is the highest-risk thiopurine genotype — zero enzymatic activity. Standard mercaptopurine doses in pediatric ALL would cause profound bone marrow failure within 2-4 weeks. Dose reduction of 85-90% is mandatory.",
-    cpic: "CPIC Level A", dosage: "Reduce dose by 85-90%; weekly CBC monitoring required during initiation", alternative: "Methotrexate-based protocol modification",
-    variants: [{ rsid: "rs1800460", allele: "C>T", impact: "HIGH", gene: "TPMT", consequence: "*3A haplotype — null TPMT" }, { rsid: "rs1142345", allele: "T>C", impact: "HIGH", gene: "TPMT", consequence: "*3A haplotype — null TPMT" }],
-    geneImpact: 98, references: ["CPIC Thiopurine 2018"], category: "Chemotherapy (Leukemia)"
-  },
-  LOVASTATIN: {
-    gene: "SLCO1B1", diplotype: "*5/*5", phenotype: "PM",
-    phenotypeLabel: "Poor Transporter Function",
-    risk: "Adjust Dosage", severity: "moderate", confidence: 0.79,
-    mechanism: "SLCO1B1 deficiency impairs hepatic lovastatin uptake, increasing systemic exposure and myopathy risk similarly to simvastatin but to a somewhat lesser degree.",
-    whyRisk: "Your SLCO1B1 *5/*5 genotype reduces lovastatin hepatic uptake, increasing systemic statin concentrations and myopathy risk. While less severe than simvastatin, significant caution is still warranted.",
-    cpic: "CPIC Level B", dosage: "Limit dose; consider statin with lower SLCO1B1 dependence", alternative: "Rosuvastatin or Pravastatin",
-    variants: [{ rsid: "rs4149056", allele: "T>C", impact: "HIGH", gene: "SLCO1B1", consequence: "p.Val174Ala" }],
-    geneImpact: 74, references: ["CPIC Statins 2022"], category: "Statin"
-  },
-  ATORVASTATIN: {
-    gene: "SLCO1B1", diplotype: "*1/*5", phenotype: "IM",
-    phenotypeLabel: "Intermediate Transporter Function",
-    risk: "Safe", severity: "none", confidence: 0.75,
-    mechanism: "Atorvastatin shows moderate SLCO1B1 dependence. Heterozygous *5 carriers have modest increase in plasma concentrations but usually tolerate standard doses.",
-    whyRisk: "Your single copy of SLCO1B1*5 slightly increases atorvastatin exposure but not to a clinically significant degree for most patients. Standard doses are generally well-tolerated. Monitor for myalgia at high doses (>40mg).",
-    cpic: "CPIC Level B", dosage: "Standard dosing appropriate; monitor for myalgia at higher doses", alternative: "No change needed; Rosuvastatin if myalgia occurs",
-    variants: [{ rsid: "rs4149056", allele: "T>C", impact: "MODERATE", gene: "SLCO1B1", consequence: "p.Val174Ala — one copy" }],
-    geneImpact: 28, references: ["CPIC Statins 2022"], category: "Statin"
-  },
-};
-
-// Generate generic entries for all other drugs
-const generateGenericDrug = (drugName) => ({
-  gene: "CYP2D6", diplotype: "*1/*1", phenotype: "NM",
-  phenotypeLabel: "Normal Metabolizer",
-  risk: "Safe", severity: "none", confidence: 0.70 + Math.random()*0.15,
-  mechanism: `${drugName} is primarily metabolized via CYP2D6. Normal metabolizer status predicts standard pharmacokinetics and expected therapeutic response at standard doses.`,
-  whyRisk: `Your genetic profile shows normal metabolizer status for ${drugName}'s primary metabolic pathway. No significant pharmacogenomic interactions are predicted. Standard dosing and monitoring is recommended per clinical guidelines.`,
-  cpic: "CPIC Level C", dosage: "Standard dosing per clinical guidelines; no pharmacogenomic adjustment indicated", alternative: "No pharmacogenomic-based alternative needed",
-  variants: [], geneImpact: 10 + Math.floor(Math.random()*25), references: ["Clinical Pharmacogenetics Implementation Consortium"], category: "Medication"
-});
+const ALL_DRUGS = Object.freeze(
+  Array.from(
+    new Set([
+      "ABACAVIR","AMITRIPTYLINE","ATAZANAVIR","ATOMOXETINE","AZATHIOPRINE",
+      "CARBAMAZEPINE","CAPECITABINE","CELECOXIB","CHLOROQUINE",
+      "CITALOPRAM","CLOMIPRAMINE","CLOPIDOGREL","CODEINE",
+      "CYCLOSPORINE","DAPSONE","DESIPRAMINE","DICLOFENAC","DOXEPIN",
+      "EFAVIRENZ","ERLOTINIB","ESCITALOPRAM","FLUOROURACIL",
+      "FLUVOXAMINE","FLUVASTATIN","GEFITINIB","GLIMEPIRIDE",
+      "GLIPIZIDE","IBUPROFEN","IMATINIB","IMIPRAMINE",
+      "IRINOTECAN","LAPATINIB","LOVASTATIN","MERCAPTOPURINE",
+      "METFORMIN","METOPROLOL","MYCOPHENOLATE","NORTRIPTYLINE",
+      "OLANZAPINE","ONDANSETRON","OXCARBAZEPINE","OXYCODONE",
+      "PAROXETINE","PHENYTOIN","PIROXICAM","PRAVASTATIN",
+      "PRIMAQUINE","RASBURICASE","RISPERIDONE","SERTRALINE",
+      "SIROLIMUS","SIMVASTATIN","TACROLIMUS","TAMOXIFEN",
+      "TEGAFUR","THIOGUANINE","TRAMADOL","TRIMIPRAMINE",
+      "VENLAFAXINE","VORICONAZOLE","WARFARIN"
+    ])
+  ).sort()
+);
 
 // ─── CONSTANTS ──────────────────────────────────────────────────────────────────
 const RISK_CONFIG = {
@@ -847,10 +610,11 @@ function RiskCard({ drug, data, delay = 0 }) {
   );
 }
 
+
 // ─── MAIN APP ────────────────────────────────────────────────────────────────────
 export default function PharmaGuard() {
   useEffect(() => { injectStyles(); }, []);
-
+  const [historyData, setHistoryData] = useState([]);
   const [page, setPage] = useState("main");
   const [file, setFile] = useState(null);
   const [fileStatus, setFileStatus] = useState(null);
@@ -876,6 +640,21 @@ export default function PharmaGuard() {
   const [medScanStatus, setMedScanStatus] = useState(null); // null | "scanning" | "done" | "error"
   const [medScanResult, setMedScanResult] = useState(null);
   const [medDragging, setMedDragging] = useState(false);
+
+  useEffect(() => {
+  const fetchHistory = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/history`);
+        const data = await res.json();
+        if (res.ok) setHistoryData(data);
+      } catch (err) {
+        console.error("History fetch failed");
+      }
+    };
+
+    fetchHistory();
+  }, []);
+
 
   const handleMedImage = async (file) => {
     if (!file) return;
@@ -906,68 +685,27 @@ export default function PharmaGuard() {
     });
 
     try {
-      const base64 = await toBase64(file);
-      const mediaType = file.type;
+      const formData = new FormData();
+      formData.append("image", file);
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch(`${API_BASE}/api/image/scan`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: mediaType, data: base64 }
-              },
-              {
-                type: "text",
-                text: `You are a pharmaceutical identification expert. Analyze this image and identify any medication/drug shown.
-
-Respond ONLY with a JSON object (no markdown, no backticks) in this exact format:
-{
-  "detected": true,
-  "drugName": "DRUG_NAME_UPPERCASE",
-  "confidence": 0.92,
-  "description": "Brief description of what you see (pill color, shape, markings, packaging)",
-  "warnings": "Any visible warnings or notes on the packaging",
-  "matchesDatabase": true
-}
-
-If no medication is detected or image is unclear, respond with:
-{
-  "detected": false,
-  "drugName": null,
-  "confidence": 0,
-  "description": "What you see in the image",
-  "warnings": null,
-  "matchesDatabase": false
-}
-
-Only set matchesDatabase to true if the drug name matches one of these: ${ALL_DRUGS.join(", ")}.
-Be precise and conservative with confidence scores.`
-              }
-            ]
-          }]
-        })
+        body: formData,
       });
 
-      const data = await response.json();
-      const text = data.content?.map(c => c.text || "").join("") || "";
-      const cleaned = text.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(cleaned);
+      const parsed = await response.json();
+
+      if (!response.ok) throw new Error(parsed.message || "Scan failed");
+
       setMedScanResult(parsed);
       setMedScanStatus("done");
 
       if (parsed.detected && parsed.matchesDatabase && parsed.drugName) {
-        showNotif(`💊 Identified: ${parsed.drugName} — click "Add to Analysis" to include it`, "success");
-      } else if (parsed.detected) {
-        showNotif(`💊 Drug detected: ${parsed.drugName || "Unknown"} — not in our database`, "error");
+        showNotif(`💊 Identified: ${parsed.drugName}`, "success");
       } else {
-        showNotif("No medication detected in image", "error");
+        showNotif("No medication detected", "warning");
       }
+
     } catch (err) {
       setMedScanStatus("error");
       showNotif("Image scan failed. Please try again.", "error");
@@ -988,23 +726,43 @@ Be precise and conservative with confidence scores.`
 
   const handleFile = async (f) => {
     if (!f) return;
+
     setFile(f);
     setFileStatus("validating");
     setResults(null);
     setSelectedDrugs([]);
+
     try {
-      if (!f.name.endsWith(".vcf") && !f.name.endsWith(".vcf.gz")) throw new Error("Invalid format: must be a .vcf file");
-      if (f.size > 5 * 1024 * 1024) throw new Error("File too large: maximum 5MB allowed");
-      const info = await parseVCF(f);
-      setFileInfo(info);
+      if (!f.name.endsWith(".vcf") && !f.name.endsWith(".vcf.gz")) {
+        throw new Error("Invalid format: must be a .vcf file");
+      }
+
+      const formData = new FormData();
+      formData.append("file", f);
+
+      const res = await fetch(`${API_BASE}/api/vcf/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message || "Upload failed");
+
+      setFileInfo(data);
       setFileStatus("valid");
-      showNotif(`✓ VCF validated — ${info.variants} variants, ${info.pgxGenes.length} PGx genes detected`, "success");
+
+      showNotif(
+        `✓ VCF validated — ${data.variants} variants, ${data.pgxGenes?.length || 0} PGx genes detected`,
+        "success"
+      );
     } catch (e) {
       setFileStatus("error");
       setFileError(e.message);
       showNotif(e.message, "error");
     }
   };
+
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
@@ -1015,19 +773,40 @@ Be precise and conservative with confidence scores.`
 
   const doAnalysis = async () => {
     if (!fileInfo || selectedDrugs.length === 0) return;
+
     setAnalyzing(true);
     setResults(null);
+
     try {
-      const r = await runAnalysis(fileInfo, selectedDrugs);
-      setResults(r);
+      const res = await fetch(`${API_BASE}/api/analysis`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    fileInfo: fileInfo,
+    drugs: selectedDrugs
+  })
+});
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message || "Analysis failed");
+
+      setResults(data);
       setActiveTab("cards");
-      setTimeout(() => document.getElementById("results-section")?.scrollIntoView({ behavior:"smooth" }), 100);
-    } catch(e) {
-      showNotif("Analysis failed — please retry", "error");
+
+      setTimeout(() => {
+        document
+          .getElementById("results-section")
+          ?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+
+    } catch (e) {
+      showNotif(e.message, "error");
     } finally {
       setAnalyzing(false);
     }
   };
+
 
   const clinicalJSON = useMemo(() => results ? buildClinicalJSON(results, fileInfo) : null, [results, fileInfo]);
 
@@ -1287,16 +1066,44 @@ ${Object.entries(results?.drugs || {}).map(([drug, data]) => `
         )}
         {sidebarContent==="history" && (
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {HISTORY.map(h => (
-              <div key={h.id} className="pg-card" style={{ padding:"13px 14px" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:7 }}>
-                  <span className="mono" style={{ fontSize:11, color:"#0B5ED7" }}>{h.sampleId}</span>
-                  <span style={{ fontSize:10, color:"#6c757d" }}>{h.date}</span>
+            {historyData.map((h, index) => (
+              <div key={h._id || h.id || index} className="pg-card">
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 7 }}>
+                  <span className="mono" style={{ fontSize: 11, color: "#0B5ED7" }}>
+                    {h.sampleId}
+                  </span>
+                  <span style={{ fontSize: 10, color: "#6c757d" }}>
+                    {new Date(h.date).toLocaleDateString()}
+                  </span>
                 </div>
-                <div style={{ fontSize:12, color:"#495057", marginBottom:7 }}>{h.drugs.join(" · ")}</div>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <span className="pg-badge" style={{ background:"rgba(239,68,68,0.1)", color:"#ef4444", border:"1px solid rgba(239,68,68,0.25)", fontSize:10 }}>{h.highRiskCount} High Risk</span>
-                  <button className="pg-btn pg-btn-ghost" style={{ padding:"4px 9px", fontSize:10 }}>View</button>
+
+                <div style={{ fontSize: 12, color: "#495057", marginBottom: 7 }}>
+                  {Array.isArray(h.drugs) ? h.drugs.join(" · ") : "No drugs"}
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span
+                    className="pg-badge"
+                    style={{
+                      background: "rgba(239,68,68,0.1)",
+                      color: "#ef4444",
+                      border: "1px solid rgba(239,68,68,0.25)",
+                      fontSize: 10
+                    }}
+                  >
+                    {h.highRiskCount || 0} High Risk
+                  </span>
+
+                  <button
+                    className="pg-btn pg-btn-ghost"
+                    style={{ padding: "4px 9px", fontSize: 10 }}
+                    onClick={() => {
+                      setResults(h.fullReport);   // if backend returns full report
+                      setPage("main");
+                    }}
+                  >
+                    View
+                  </button>
                 </div>
               </div>
             ))}
@@ -1947,6 +1754,7 @@ ${Object.entries(results?.drugs || {}).map(([drug, data]) => `
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
 
 
@@ -3593,3 +3401,6 @@ ${Object.entries(results?.drugs || {}).map(([drug, data]) => `
 //     </div>
 //   );
 // }
+=======
+}
+>>>>>>> 8a9c22e (Remove dots)
