@@ -1745,7 +1745,7 @@ ${Object.entries(results?.drugs || {}).map(([drug, data]) => `
               </div>
             </div>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              {["Privacy Policy","Terms of Use","Contact","Documentation"].map(l => (
+              {["Privacy Policy","Terms of Use.","Contact","Documentation"].map(l => (
                 <button key={l} className="pg-btn pg-btn-ghost" style={{ fontSize:11, padding:"5px 12px" }}>{l}</button>
               ))}
             </div>
