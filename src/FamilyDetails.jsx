@@ -339,7 +339,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen, navigate }) {
         </div>
         <div style={{ textAlign:"center", marginBottom:22 }}>
           <div style={{ width:76, height:76, borderRadius:"50%", background:"linear-gradient(135deg,#0B5ED7,#20C997)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, fontWeight:800, color:"#fff", margin:"0 auto 10px" }}>DR</div>
-          <div className="syne" style={{ fontSize:16, fontWeight:700, color:"#212529" }}>Dr. Emily Roberts</div>
+          <div className="syne" style={{ fontSize:16, fontWeight:700, color:"#212529" }}>Aditya Sharma</div>
           <div style={{ fontSize:12, color:"#8fa3b8" }}>Clinical Pharmacogenomics</div>
           <div className="pg-badge" style={{ background:"rgba(11,94,215,0.08)", color:"#0B5ED7", border:"1px solid rgba(11,94,215,0.2)", marginTop:7 }}>🏥 Mount Sinai Hospital</div>
         </div>
