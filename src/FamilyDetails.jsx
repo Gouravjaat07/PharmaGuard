@@ -1127,7 +1127,7 @@ function FamilyTreeViz({ members }) {
 // ─── FAMILY PAGE ──────────────────────────────────────────────────────────────
 function FamilyPage({ navigate }) {
   const [members, setMembers] = useState([
-    { id:"demo1", name:"Dr. Roberts", relation:"Self", age:42, gender:"Female", bloodGroup:"O+", medicalConditions:"Hypertension", allergies:"Penicillin", currentMedications:"Lisinopril 10mg", vcfState:null, analysisResults:null },
+    { id:"demo1", name:"Aditya Sharma", relation:"Self", age:22, gender:"Male", bloodGroup:"O+", medicalConditions:"Hypertension", allergies:"Penicillin", currentMedications:"Lisinopril 10mg", vcfState:null, analysisResults:null },
   ]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editMember, setEditMember] = useState(null);

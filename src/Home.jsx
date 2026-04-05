@@ -940,11 +940,11 @@ export default function Home() {
                 </div>
 
                 <h1 className="lora" style={{ fontSize: "clamp(30px,5vw,60px)", fontWeight: 800, lineHeight: 1.08, marginBottom: 20, color: "#0B5ED7" }}>
-                  The Right Drug{" "}
+                  The Right Drug.{" "}
                   <span style={{ background: "linear-gradient(135deg, #0B5ED7, #20C997)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                    The Right Dose
+                    The Right Dose.
                   </span>
-                  <br /><span style={{ color: "#212529" }}>For Every Genome</span>
+                  <br /><span style={{ color: "#212529" }}>For Every Genome.</span>
                 </h1>
 
                 <p style={{ fontSize: "clamp(13px,2vw,15px)", lineHeight: 1.8, color: "#495057", marginBottom: 28, maxWidth: 520 }}>
