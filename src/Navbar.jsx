@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 const NAV_ITEMS = [
   { label: "Analysis",        key: "main",       path: "/analysis",       dot: false, internal: false },
-  { label: "👨‍👩‍👧‍👦 Family",    key: "family",     path: "/family-section", dot: true,  internal: false },
+  { label: "👨‍👩‍👧‍👦 Family",    key: "family",     path: "/family-section", dot: false,  internal: false },
   { label: "Book Technician",  key: "technician", path: "/technician",     dot: false, internal: false },
   { label: "History",          key: "history",    path: "/history",        dot: false, internal: true  },
   { label: "About",            key: "about",      path: "/about",          dot: false, internal: true  },
